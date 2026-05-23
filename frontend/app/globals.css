@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+
+
+:root {
+  --background: #020617; /* Slate-950 */
+  --foreground: #e2e8f0;
+}
+
+body {
+  background-color: #020617;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', 'Share Tech Mono', monospace;
+  overflow: hidden;
+  height: 100vh;
+}
+
+
+
+
+/* Monospace font utilities */
+.font-rajdhani {
+  font-family: 'Rajdhani', sans-serif;
+}
+.font-sharetech {
+  font-family: 'Share Tech Mono', monospace;
+}
+.font-jetbrains {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Ticker tape animations */
+.ticker-wrap {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ticker {
+  display: inline-block;
+  animation: ticker 40s linear infinite;
+}
+@keyframes ticker {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* Custom scrollbars */
+.terminal-scroll::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.terminal-scroll::-webkit-scrollbar-track {
+  background: #020617;
+}
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 2px;
+}
+.terminal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Tactical grid overlay pattern */
+.reticle-crosshair {
+  background-image: 
+    linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Military corner clips */
+.clip-chamfer {
+  clip-path: polygon(
+    0px 8px, 
+    8px 0px, 
+    calc(100% - 8px) 0px, 
+    100% 8px, 
+    100% calc(100% - 8px), 
+    calc(100% - 8px) 100%, 
+    8px 100%, 
+    0px calc(100% - 8px)
+  );
+}
+
+.clip-chamfer-lg {
+  clip-path: polygon(
+    0px 16px, 
+    16px 0px, 
+    calc(100% - 16px) 0px, 
+    100% 16px, 
+    100% calc(100% - 16px), 
+    calc(100% - 16px) 100%, 
+    16px 100%, 
+    0px calc(100% - 16px)
+  );
+}

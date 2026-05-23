@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>STEEL SENTINEL | COMMAND AND CONTROL</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#e2e2e2",
+                        "on-primary": "#000000",
+                        "background": "#000000",
+                        "surface": "#121212",
+                        "surface-container": "#1a1a1a",
+                        "outline": "#333333",
+                        "error": "#ff4d4d",
+                        "secondary": "#a3a3a3",
+                        "on-surface": "#e2e2e2",
+                        "on-surface-variant": "#888888"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    "fontFamily": {
+                        "sans": ["JetBrains Mono", "monospace"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: -0.02em;
+        }
+        .terminal-scroll::-webkit-scrollbar { width: 2px; }
+        .terminal-scroll::-webkit-scrollbar-track { background: #000000; }
+        .terminal-scroll::-webkit-scrollbar-thumb { background: #333333; }
+        
+        .ticker-wrap { overflow: hidden; white-space: nowrap; }
+        .ticker { display: inline-block; animation: ticker 60s linear infinite; }
+        @keyframes ticker {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        
+        /* Tactical Reticle Lines */
+        .reticle-crosshair {
+            background-image: 
+                linear-gradient(to right, #333 1px, transparent 1px),
+                linear-gradient(to bottom, #333 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface text-[11px] overflow-hidden h-screen selection:bg-white selection:text-black">
+<!-- Header -->
+<header class="fixed top-0 left-0 w-full z-[60] flex justify-between items-center px-4 h-10 border-b border-outline bg-surface">
+<div class="flex items-center gap-6">
+<span class="font-bold tracking-tight text-[12px] border-r border-outline pr-6 h-10 flex items-center">STEEL SENTINEL / C2</span>
+<nav class="hidden lg:flex items-center gap-4">
+<a class="text-primary border-b border-primary py-2" href="#">[ STRAT_MAP ]</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors py-2" href="#">[ UNIT_COMMS ]</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors py-2" href="#">[ INTEL_FEED ]</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors py-2" href="#">[ DEF_GRID ]</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-2 py-0.5 border border-error/50 bg-error/5">
+<span class="text-[9px] text-error font-bold">DEFCON 2</span>
+<div class="w-1.5 h-1.5 bg-error"></div>
+</div>
+<div class="text-[10px] text-on-surface-variant tabular-nums border-l border-outline pl-4 h-10 flex items-center" id="utc-clock">00:00:00 UTC</div>
+<div class="flex items-center gap-3 border-l border-outline pl-4 h-10">
+<button class="material-symbols-outlined text-[18px] text-on-surface-variant hover:text-primary transition-colors">notifications</button>
+<button class="material-symbols-outlined text-[18px] text-on-surface-variant hover:text-primary transition-colors">settings</button>
+</div>
+</div>
+</header>
+<!-- Alert Ticker -->
+<div class="fixed top-10 left-0 w-full h-5 bg-surface border-b border-outline z-[55] flex items-center">
+<div class="bg-outline px-3 h-full flex items-center text-[9px] text-on-surface font-bold">STATUS</div>
+<div class="ticker-wrap flex-1">
+<div class="ticker text-[9px] text-on-surface-variant uppercase py-1">
+            SYS_CHECK: ALL NODES OPERATIONAL /// SAT_LINK: ESTABLISHED (99.2% STRENGTH) /// WARNING: DEGRADED SIGNAL SECTOR 7G /// GPS: ENCRYPTED MODE /// AUTH: VERIFIED
+        </div>
+</div>
+</div>
+<!-- Left Sidebar -->
+<aside class="fixed left-0 top-15 w-12 h-[calc(100vh-60px)] z-50 bg-black border-r border-outline flex flex-col items-center py-4 gap-6 mt-[60px]">
+<div class="w-8 h-8 border border-outline flex items-center justify-center bg-surface">
+<span class="material-symbols-outlined text-primary text-[18px]">radar</span>
+</div>
+<nav class="flex flex-col gap-4">
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors text-[20px]">military_tech</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors text-[20px]">hub</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors text-[20px]">terminal</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors text-[20px]">map</button>
+</nav>
+<div class="mt-auto pb-4 flex flex-col gap-4 items-center">
+<button class="material-symbols-outlined text-error/60 hover:text-error transition-colors text-[20px]">emergency_home</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:text-error transition-colors text-[20px]">power_settings_new</button>
+</div>
+</aside>
+<!-- Main Tactical Environment -->
+<main class="fixed inset-0 pt-[60px] pl-12 z-10 bg-black overflow-hidden">
+<section class="w-full h-full relative">
+<!-- Satellite / Tactical Map -->
+<div class="w-full h-full brightness-[0.85] contrast-[1.1]">
+<img alt="High-fidelity 3D topographical satellite map of a dense urban city at sunset" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrYPrxtHbq8mXnreeNzNLT5dVzXebwgs9JU6mlmlkvoh42cNk9OSC56wSyUabKJ0u7ujEVYIovDMjlal5DlDY1j_lUQpmfzj8EJYmSzpnjPS4t4Zz9-I5scOB0_JTQPFT-D6N_TDdzfr1HH8qL2LudAStITXFZWsBt3ONsjqBUfKBlAaTNySW6ltxfnjLDkznm2Ak9HlkfRAmpRvbpG5HwNRj8C_zqdV4Bg3peKAzWrGe4EyxnWv2CbP8KdXoF11kINR-p6LpIwcNN"/>
+</div>
+<!-- Reticle Overlay -->
+<div class="absolute inset-0 pointer-events-none reticle-crosshair opacity-30"></div>
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<div class="relative w-48 h-48 border border-white/20">
+<div class="absolute top-0 left-1/2 -translate-x-1/2 w-px h-8 bg-white/40"></div>
+<div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-px h-8 bg-white/40"></div>
+<div class="absolute left-0 top-1/2 -translate-y-1/2 h-px w-8 bg-white/40"></div>
+<div class="absolute right-0 top-1/2 -translate-y-1/2 h-px w-8 bg-white/40"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-4 h-4 border border-white/40"></div>
+</div>
+</div>
+</div>
+<!-- Tactical Markers -->
+<div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
+<div class="w-2 h-2 border-2 border-primary rotate-45 shadow-[0_0_8px_rgba(255,255,255,0.5)]"></div>
+<span class="text-[8px] bg-black/80 px-1 border border-outline">OBJ_ALPHA</span>
+</div>
+<div class="absolute top-2/3 left-1/4 flex flex-col items-center gap-1">
+<div class="w-2 h-2 bg-error shadow-[0_0_8px_rgba(255,77,77,0.5)]"></div>
+<span class="text-[8px] bg-black/80 px-1 border border-outline text-error">HOSTILE_SIG</span>
+</div>
+<!-- Floating Data Panels -->
+<!-- Top Left: Feed Info -->
+<div class="absolute top-4 left-4 flex gap-2 pointer-events-none">
+<div class="px-2 py-1 bg-surface border border-outline">
+<div class="text-[8px] text-on-surface-variant mb-0.5">FEED:</div>
+<div class="font-bold text-primary">NRO_SAT_729B</div>
+</div>
+<div class="px-2 py-1 bg-surface border border-outline">
+<div class="text-[8px] text-on-surface-variant mb-0.5">LOCAL:</div>
+<div class="text-primary tabular-nums" id="local-time-hud">00:00:00</div>
+</div>
+</div>
+<!-- Left: Node Status -->
+<div class="absolute top-20 left-4 w-48 flex flex-col gap-1 pointer-events-auto">
+<div class="bg-surface border border-outline px-2 py-1 flex justify-between items-center mb-1">
+<span class="text-[9px] font-bold">STRATEGIC_NODES</span>
+<span class="text-[8px] text-on-surface-variant">06/07</span>
+</div>
+<div class="space-y-px">
+<div class="bg-surface border border-outline p-1.5 flex items-center gap-2 hover:bg-surface-container transition-all cursor-pointer">
+<div class="w-1.5 h-1.5 bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]"></div>
+<div class="flex-1">
+<div class="text-[9px]">PWR_PLANT_ALPHA</div>
+<div class="text-[8px] text-on-surface-variant">STATUS: NOMINAL // LOAD 98%</div>
+</div>
+</div>
+<div class="bg-surface border border-error/50 p-1.5 flex items-center gap-2">
+<div class="w-1.5 h-1.5 bg-error shadow-[0_0_4px_rgba(255,77,77,0.5)]"></div>
+<div class="flex-1">
+<div class="text-[9px] text-error font-bold">COMMS_ARRAY_MAIN</div>
+<div class="text-[8px] text-error/80">SIGNAL_INTERFERENCE_DET</div>
+</div>
+</div>
+<div class="bg-surface border border-outline p-1.5 flex items-center gap-2">
+<div class="w-1.5 h-1.5 bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.5)]"></div>
+<div class="flex-1">
+<div class="text-[9px]">MED_CENT_WEST</div>
+<div class="text-[8px] text-on-surface-variant">STATUS: NOMINAL</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right: Systems & Log -->
+<div class="absolute top-4 right-4 w-56 flex flex-col gap-2 pointer-events-auto">
+<!-- Active Systems -->
+<div class="bg-surface border border-outline p-2">
+<h3 class="text-[9px] font-bold mb-2 pb-1 border-b border-outline">SYSTEM_STATUS</h3>
+<div class="space-y-3">
+<div>
+<div class="flex justify-between items-center mb-1">
+<span class="text-[9px]">WRE JAMMER</span>
+<span class="text-[8px] text-primary">ACTIVE</span>
+</div>
+<div class="h-1 bg-black border border-outline">
+<div class="h-full bg-primary w-3/4"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-center mb-1">
+<span class="text-[9px]">PILICA_BATTERY</span>
+<span class="text-[8px] text-green-500">READY</span>
+</div>
+<div class="h-1 bg-black border border-outline">
+<div class="h-full bg-green-500 w-full"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Live Log -->
+<div class="bg-surface border border-outline p-2 flex flex-col h-48">
+<div class="text-[8px] text-on-surface-variant mb-1.5 border-b border-outline pb-1 flex justify-between">
+<span>LIVE_EVENT_LOG</span>
+<span>v4.0.1</span>
+</div>
+<div class="flex-1 terminal-scroll overflow-y-auto text-[9px] leading-tight text-on-surface-variant space-y-1" id="combat-log">
+<p class="text-error font-bold">[15:42:12] MISSILE LOCK DETECTED</p>
+<p class="text-primary">[15:42:15] FREQ_SHIFT: 8.4GHz</p>
+<p>[15:42:18] RADAR_SWEEP_COMPLETE</p>
+<p class="text-green-500">[15:42:20] TARGET_ACQUIRED_S4</p>
+</div>
+</div>
+</div>
+<!-- Bottom: Telemetry -->
+<div class="absolute bottom-4 left-1/2 -translate-x-1/2 px-8 py-2 bg-surface border border-outline flex gap-8 shadow-2xl">
+<div class="flex flex-col">
+<span class="text-on-surface-variant text-[8px] font-bold">COORDINATES</span>
+<span class="text-primary tracking-wider font-bold">40.7128 N / 74.0060 W</span>
+</div>
+<div class="flex flex-col border-l border-outline pl-8">
+<span class="text-on-surface-variant text-[8px] font-bold">ALTITUDE</span>
+<span class="text-primary">1,240m</span>
+</div>
+<div class="flex flex-col border-l border-outline pl-8">
+<span class="text-on-surface-variant text-[8px] font-bold">AZIMUTH</span>
+<span class="text-primary">284.15°</span>
+</div>
+<div class="flex flex-col border-l border-outline pl-8">
+<span class="text-on-surface-variant text-[8px] font-bold">AIRSPEED</span>
+<span class="text-primary">420.4 KM/H</span>
+</div>
+</div>
+<!-- Heading Tape -->
+<div class="absolute top-4 left-1/2 -translate-x-1/2 w-64 flex flex-col items-center pointer-events-none">
+<div class="flex gap-8 text-[9px] text-on-surface-variant border-b border-outline pb-1 w-full justify-center overflow-hidden">
+<span>240</span><span>255</span><span class="text-primary font-bold">W</span><span>285</span><span>300</span>
+</div>
+<div class="w-px h-2 bg-primary"></div>
+</div>
+</section>
+</main>
+<script>
+    function updateClock() {
+        const now = new Date();
+        const timeStr = now.toISOString().split('T')[1].split('.')[0] + ' UTC';
+        const clockEl = document.getElementById('utc-clock');
+        const hudEl = document.getElementById('local-time-hud');
+        if (clockEl) clockEl.textContent = timeStr;
+        if (hudEl) hudEl.textContent = now.toLocaleTimeString([], { hour12: false });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    const log = document.getElementById('combat-log');
+    const phrases = [
+        "[TIMESTAMP] SCANNING_SECTOR_7G...",
+        "[TIMESTAMP] <span class='text-error font-bold'>SIG_IDENTIFIED: UAV_ALPHA</span>",
+        "[TIMESTAMP] SIG_STRENGTH: -68.4dBm",
+        "[TIMESTAMP] <span class='text-primary'>ECCM_ACTIVE: MODE_4</span>",
+        "[TIMESTAMP] NODE_01_HEARTBEAT: OK",
+        "[TIMESTAMP] <span class='text-green-500'>TRK_LOCK_CONFIRMED</span>",
+        "[TIMESTAMP] RECALIBRATING_OPTICAL_FEED..."
+    ];
+
+    function addLogEntry() {
+        const now = new Date();
+        const time = now.toTimeString().split(' ')[0];
+        const entry = phrases[Math.floor(Math.random() * phrases.length)].replace('TIMESTAMP', time);
+        
+        const p = document.createElement('p');
+        p.innerHTML = entry;
+        log.appendChild(p);
+        
+        if (log.children.length > 20) log.removeChild(log.firstChild);
+        log.scrollTop = log.scrollHeight;
+    }
+    setInterval(addLogEntry, 4000);
+</script>
+</body></html>
