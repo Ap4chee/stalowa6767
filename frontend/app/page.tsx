@@ -19,6 +19,7 @@ import { CommandLogger } from "./components/CommandLogger";
 import { TelemetryHUD } from "./components/TelemetryHUD";
 import { ObjectDetailCard } from "./components/ObjectDetailCard";
 import { DependencyFlow } from "./components/DependencyFlow";
+import { ThreatModelViewer } from "./components/ThreatModelViewer";
 
 export default function SteelSentinelDashboard() {
   const [nodes, setNodes] = useState<CriticalNode[]>(INITIAL_NODES);
@@ -47,6 +48,7 @@ export default function SteelSentinelDashboard() {
   const [radarCollapsed, setRadarCollapsed] = useState(false);
   const [loggerCollapsed, setLoggerCollapsed] = useState(false);
   const [schemaModeEnabled, setSchemaModeEnabled] = useState(false);
+  const [threatViewerOpen, setThreatViewerOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [mapLayers, setMapLayers] = useState({
     baseMap: true,
@@ -353,6 +355,10 @@ export default function SteelSentinelDashboard() {
           setTheme(nextTheme);
           addLog(`MOTYW SYSTEMOWY: Zmieniono motyw graficzny na ${nextTheme === "light" ? "JASNY" : "CIEMNY"}.`, "info");
         }}
+        onOpenThreatViewer={() => {
+          setThreatViewerOpen(true);
+          addLog("ROZPOZNANIE: Uruchomiono podgląd 3D modeli zagrożeń.", "info");
+        }}
       />
 
       <AlertTicker threats={threats} />
@@ -471,6 +477,10 @@ export default function SteelSentinelDashboard() {
         onRemoveSystem={handleRemoveSystem}
         onFlyTo={flyToNode}
         leftSidebarCollapsed={leftPanelCollapsed}
+      />
+      <ThreatModelViewer
+        isOpen={threatViewerOpen}
+        onClose={() => setThreatViewerOpen(false)}
       />
     </div>
   );

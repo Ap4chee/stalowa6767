@@ -1,6 +1,6 @@
 "use client";
 
-import { Shield, Compass, Volume2, VolumeX, Network, Sun, Moon } from "lucide-react";
+import { Shield, Compass, Volume2, VolumeX, Network, Sun, Moon, Crosshair } from "lucide-react";
 import { LogType } from "../types";
 
 interface HeaderProps {
@@ -13,6 +13,7 @@ interface HeaderProps {
   onToggleSchemaMode: () => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  onOpenThreatViewer: () => void;
 }
 
 export function Header({
@@ -24,6 +25,7 @@ export function Header({
   onToggleSchemaMode,
   theme,
   onToggleTheme,
+  onOpenThreatViewer,
 }: HeaderProps) {
   return (
     <header className="fixed top-0 left-0 w-full z-[60] flex justify-between items-center px-4 h-12 border-b theme-border theme-bg-panel font-rajdhani backdrop-blur-md">
@@ -54,6 +56,14 @@ export function Header({
         >
           <Network className="w-3.5 h-3.5" />
           <span>TRYB SCHEMATU</span>
+        </button>
+        <button
+          onClick={onOpenThreatViewer}
+          className="px-3 py-1 text-[10px] border flex items-center gap-1.5 font-bold tracking-widest transition-all cursor-pointer theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-panel-hover"
+          title="Otwórz podgląd 3D modeli zagrożeń"
+        >
+          <Crosshair className="w-3.5 h-3.5" />
+          <span>ROZPOZNANIE 3D</span>
         </button>
         <div className={`flex items-center gap-2 px-3 py-1 border transition-all ${
           defcon === 1
