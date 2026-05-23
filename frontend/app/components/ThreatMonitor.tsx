@@ -5,13 +5,16 @@ import { Threat, CriticalNode } from "../types";
 interface ThreatMonitorProps {
   threats: Threat[];
   nodes: CriticalNode[];
+  isOpen: boolean;
 }
 
-export function ThreatMonitor({ threats, nodes }: ThreatMonitorProps) {
+export function ThreatMonitor({ threats, nodes, isOpen }: ThreatMonitorProps) {
   const activeCount = threats.filter(t => t.status === "FLYING").length;
 
   return (
-    <section className="fixed left-4 bottom-4 w-80 h-36 z-40 font-mono bg-slate-950/90 border border-slate-800/80 p-3 clip-chamfer text-[11px] shadow-2xl backdrop-blur-md flex flex-col">
+    <section className={`fixed left-4 bottom-4 w-80 h-36 z-40 font-mono bg-slate-950/90 border border-slate-800/80 p-3 clip-chamfer text-[11px] shadow-2xl backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out ${
+      isOpen ? "translate-x-0" : "-translate-x-[340px]"
+    }`}>
       <div className="text-[10px] text-slate-400 font-rajdhani tracking-wider pb-1 border-b border-slate-900 flex justify-between items-center mb-1">
         <span>MONITOR WYKRYWANIA RADAROWEGO</span>
         <span className="text-[9px] bg-red-950/20 px-1 border border-red-550/40 text-red-500 font-bold font-sharetech">

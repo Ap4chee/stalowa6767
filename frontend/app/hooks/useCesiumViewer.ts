@@ -16,6 +16,8 @@ interface UseCesiumViewerOptions {
   setNodes: (fn: (prev: CriticalNode[]) => CriticalNode[]) => void;
   setSelectedWeapon: (val: string | null) => void;
   setHoveredCoords: (val: HoveredCoords) => void;
+  setSelectedNode?: (node: CriticalNode | null) => void;
+  setSelectedSystem?: (sys: DeployedSystem | null) => void;
 }
 
 export function useCesiumViewer({
@@ -28,13 +30,15 @@ export function useCesiumViewer({
   setThreats,
   setNodes,
   setSelectedWeapon,
-  setHoveredCoords
+  setHoveredCoords,
+  setSelectedNode,
+  setSelectedSystem
 }: UseCesiumViewerOptions) {
   const viewerRef = useRef<any>(null);
   const nodeEntitiesRef = useRef<{ [id: string]: any }>({});
   const domeEntitiesRef = useRef<{ [id: string]: any }>({});
   const threatEntitiesRef = useRef<{ [id: string]: any }>({});
-  const laserLinesRef = useRef<any[]>([]);
+  const laserLinesRef = useRef<any>(null);
   const [isCesiumLoaded, setIsCesiumLoaded] = useState(false);
 
   const flyToNode = useCallback((lat: number, lon: number, name: string) => {
@@ -67,6 +71,10 @@ export function useCesiumViewer({
     });
     threatEntitiesRef.current = {};
 
+    if (laserLinesRef.current && typeof laserLinesRef.current.removeAll === "function") {
+      laserLinesRef.current.removeAll();
+    }
+
     const Cesium = (window as any).Cesium;
     INITIAL_NODES.forEach((node) => {
       const entity = nodeEntitiesRef.current[node.id];
@@ -74,6 +82,22 @@ export function useCesiumViewer({
         entity.point.color = Cesium.Color.fromCssColorString("#22c55e");
       }
     });
+  }, []);
+
+  const removeDeployedSystem = useCallback((sysId: string) => {
+    const viewer = viewerRef.current;
+    const Cesium = (window as any).Cesium;
+    if (!viewer || !Cesium) return;
+
+    const idsToRemove = [sysId, `${sysId}_tower`, `${sysId}_beacon`, `${sysId}_label`];
+    idsToRemove.forEach(id => {
+      const ent = viewer.entities.getById(id);
+      if (ent) viewer.entities.remove(ent);
+    });
+
+    if (domeEntitiesRef.current[sysId]) {
+      delete domeEntitiesRef.current[sysId];
+    }
   }, []);
 
   useEffect(() => {
@@ -96,7 +120,7 @@ export function useCesiumViewer({
       imageryProvider: false as any
     });
 
-    viewer.resolutionScale = window.devicePixelRatio || 1.0;
+    viewer.resolutionScale = Math.min(1.0, window.devicePixelRatio || 1.0);
     viewer.useBrowserRecommendedResolution = false;
 
     viewerRef.current = viewer;
@@ -104,77 +128,92 @@ export function useCesiumViewer({
 
     viewer.imageryLayers.addImageryProvider(
       new Cesium.UrlTemplateImageryProvider({
-        url: "https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+        url: "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png",
         credit: "CartoDB",
         maximumLevel: 19
       })
     );
 
-    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#e8e8e8");
-    viewer.scene.skyAtmosphere.show = true;
-    viewer.scene.fog.enabled = true;
-    viewer.scene.globe.showGroundAtmosphere = true;
+    const laserCollection = viewer.scene.primitives.add(new Cesium.PolylineCollection());
+    laserLinesRef.current = laserCollection;
+
+    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#f3f4f6");
+    viewer.scene.skyAtmosphere.show = false;
+    viewer.scene.fog.enabled = false;
+    viewer.scene.globe.showGroundAtmosphere = false;
     viewer.scene.globe.enableLighting = false;
-    viewer.scene.globe.depthTestAgainstTerrain = true;
+    viewer.scene.globe.depthTestAgainstTerrain = false;
 
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat - 0.018, 4500),
       orientation: {
         heading: Cesium.Math.toRadians(15.0),
-        pitch: Cesium.Math.toRadians(-42.0),
+        pitch: Cesium.Math.toRadians(-38.0),
         roll: 0.0
       }
     });
 
     INITIAL_NODES.forEach((node) => {
       const color = NODE_COLORS[node.type] || "#16a34a";
+      const glassColor = Cesium.Color.fromCssColorString(color).withAlpha(0.25);
 
-      if (node.type === "industrial") {
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 20), box: { dimensions: new Cesium.Cartesian3(200, 100, 40), material: Cesium.Color.fromCssColorString("#334155").withAlpha(0.9), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon - 0.001, node.lat + 0.0005, 15), box: { dimensions: new Cesium.Cartesian3(120, 70, 30), material: Cesium.Color.fromCssColorString("#475569").withAlpha(0.85), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-      } else if (node.type === "power") {
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 50), cylinder: { length: 100, topRadius: 22, bottomRadius: 32, material: Cesium.Color.fromCssColorString("#64748b").withAlpha(0.85), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon + 0.001, node.lat - 0.0004, 50), cylinder: { length: 100, topRadius: 22, bottomRadius: 32, material: Cesium.Color.fromCssColorString("#64748b").withAlpha(0.85), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon - 0.0008, node.lat + 0.0006, 75), cylinder: { length: 150, topRadius: 4, bottomRadius: 7, material: Cesium.Color.fromCssColorString("#94a3b8").withAlpha(0.9), outline: true, outlineColor: Cesium.Color.fromCssColorString("#dc2626") } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon + 0.0005, node.lat + 0.0003, 18), box: { dimensions: new Cesium.Cartesian3(160, 60, 36), material: Cesium.Color.fromCssColorString("#475569").withAlpha(0.85), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-      } else if (node.type === "water") {
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 15), cylinder: { length: 30, topRadius: 18, bottomRadius: 18, material: Cesium.Color.fromCssColorString("#1e40af").withAlpha(0.7), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon + 0.0008, node.lat, 12), cylinder: { length: 24, topRadius: 14, bottomRadius: 14, material: Cesium.Color.fromCssColorString("#1e40af").withAlpha(0.7), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon - 0.0006, node.lat + 0.0004, 8), box: { dimensions: new Cesium.Cartesian3(60, 40, 16), material: Cesium.Color.fromCssColorString("#475569").withAlpha(0.85), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-      } else if (node.type === "electrical") {
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 8), box: { dimensions: new Cesium.Cartesian3(50, 40, 16), material: Cesium.Color.fromCssColorString("#475569").withAlpha(0.85), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon + 0.0004, node.lat - 0.0002, 20), cylinder: { length: 40, topRadius: 1.5, bottomRadius: 3, material: Cesium.Color.fromCssColorString("#94a3b8"), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-      } else if (node.type === "logistic") {
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 5), box: { dimensions: new Cesium.Cartesian3(120, 25, 10), material: Cesium.Color.fromCssColorString("#475569").withAlpha(0.85), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat + 0.0003, 2), box: { dimensions: new Cesium.Cartesian3(200, 8, 4), material: Cesium.Color.fromCssColorString("#64748b").withAlpha(0.7), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-      } else if (node.type === "transit") {
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 12), box: { dimensions: new Cesium.Cartesian3(18, 200, 4), material: Cesium.Color.fromCssColorString("#64748b").withAlpha(0.9), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon - 0.0003, node.lat + 0.0006, 22), cylinder: { length: 44, topRadius: 2, bottomRadius: 3, material: Cesium.Color.fromCssColorString("#475569"), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon + 0.0003, node.lat - 0.0006, 22), cylinder: { length: 44, topRadius: 2, bottomRadius: 3, material: Cesium.Color.fromCssColorString("#475569"), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-      } else if (node.type === "hq") {
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 8), cylinder: { length: 16, topRadius: 22, bottomRadius: 22, slices: 6, material: Cesium.Color.fromCssColorString("#334155").withAlpha(0.9), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 22), cylinder: { length: 12, topRadius: 1, bottomRadius: 3, material: Cesium.Color.fromCssColorString("#64748b"), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-        viewer.entities.add({ position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 30), ellipsoid: { radii: new Cesium.Cartesian3(5, 5, 5), material: Cesium.Color.fromCssColorString(color).withAlpha(0.8), outline: true, outlineColor: Cesium.Color.fromCssColorString(color) } });
-      }
-
+      // 1. Sleek Single-Primitive Glassmorphic Hexagonal Tower (No heavy outlines!)
       viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat),
-        ellipse: { semiMajorAxis: 100, semiMinorAxis: 100, material: Cesium.Color.fromCssColorString(color).withAlpha(0.1), outline: true, outlineColor: Cesium.Color.fromCssColorString(color).withAlpha(0.6), outlineWidth: 2, height: 0 }
+        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 25),
+        cylinder: {
+          length: 50,
+          topRadius: 16,
+          bottomRadius: 16,
+          slices: 6,
+          material: glassColor,
+          outline: false
+        }
       });
 
+      // 2. Tactical Vertical Beacon Line (Extremely lightweight, links ground to floating label)
+      viewer.entities.add({
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+            node.lon, node.lat, 0,
+            node.lon, node.lat, 180
+          ]),
+          width: 1.5,
+          material: Cesium.Color.fromCssColorString(color).withAlpha(0.75)
+        }
+      });
+
+      // 3. Ground-Level Tactical Highlight Ring
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat),
+        ellipse: {
+          semiMajorAxis: 90,
+          semiMinorAxis: 90,
+          material: Cesium.Color.fromCssColorString(color).withAlpha(0.1),
+          outline: false,
+          height: 0
+        }
+      });
+
+      // 4. Primary Label (High resolution, supersampled dark text with crisp white halo!)
       const nodeEntity = viewer.entities.add({
         id: node.id,
         position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
-        point: { pixelSize: 10, color: Cesium.Color.fromCssColorString(color), outlineColor: Cesium.Color.WHITE, outlineWidth: 2, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+        point: {
+          pixelSize: 10,
+          color: Cesium.Color.fromCssColorString(color),
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2.5,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
         label: {
           text: node.name.toUpperCase(),
-          font: "bold 32px Share Tech Mono, monospace",
-          fillColor: Cesium.Color.fromCssColorString(color),
+          font: "bold 42px Share Tech Mono, monospace",
+          fillColor: Cesium.Color.fromCssColorString("#0f172a"),
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineColor: Cesium.Color.fromCssColorString("#020617").withAlpha(0.85),
-          outlineWidth: 3,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 6,
           showBackground: false,
-          scale: 0.35,
+          scale: 0.3,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -18),
           disableDepthTestDistance: Number.POSITIVE_INFINITY
@@ -182,17 +221,18 @@ export function useCesiumViewer({
       });
       nodeEntitiesRef.current[node.id] = nodeEntity;
 
+      // 5. Secondary Coordinate Label (High-contrast, crisp!)
       viewer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
         label: {
           text: `[${node.id}] ${node.lat.toFixed(4)}°N ${node.lon.toFixed(4)}°E`,
-          font: "bold 24px JetBrains Mono, monospace",
-          fillColor: Cesium.Color.fromCssColorString("#64748b"),
+          font: "bold 28px JetBrains Mono, monospace",
+          fillColor: Cesium.Color.fromCssColorString("#475569"),
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineColor: Cesium.Color.fromCssColorString("#020617").withAlpha(0.65),
-          outlineWidth: 3,
+          outlineColor: Cesium.Color.WHITE.withAlpha(0.95),
+          outlineWidth: 5,
           showBackground: false,
-          scale: 0.35,
+          scale: 0.3,
           verticalOrigin: Cesium.VerticalOrigin.TOP,
           pixelOffset: new Cesium.Cartesian2(0, 10),
           disableDepthTestDistance: Number.POSITIVE_INFINITY
@@ -224,11 +264,12 @@ export function useCesiumViewer({
       position: Cesium.Cartesian3.fromDegrees(22.0620, 50.5700, 50),
       label: {
         text: "RZEKA SAN",
-        font: "bold 10px Share Tech Mono, monospace",
-        fillColor: Cesium.Color.CYAN.withAlpha(0.7),
+        font: "bold 32px Share Tech Mono, monospace",
+        fillColor: Cesium.Color.fromCssColorString("#0284c7"),
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        outlineWidth: 2,
-        outlineColor: Cesium.Color.BLACK,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 5,
+        scale: 0.35,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       }
     });
@@ -247,9 +288,12 @@ export function useCesiumViewer({
       position: Cesium.Cartesian3.fromDegrees(22.01, 50.60, 30),
       label: {
         text: "ZONA TAKTYCZNA STW // NW",
-        font: "8px JetBrains Mono, monospace",
-        fillColor: Cesium.Color.CYAN.withAlpha(0.35),
-        style: Cesium.LabelStyle.FILL,
+        font: "bold 28px JetBrains Mono, monospace",
+        fillColor: Cesium.Color.fromCssColorString("#0891b2"),
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 4,
+        scale: 0.3,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       }
     });
@@ -257,16 +301,24 @@ export function useCesiumViewer({
       position: Cesium.Cartesian3.fromDegrees(22.09, 50.52, 30),
       label: {
         text: "ZONA TAKTYCZNA STW // SE",
-        font: "8px JetBrains Mono, monospace",
-        fillColor: Cesium.Color.CYAN.withAlpha(0.35),
-        style: Cesium.LabelStyle.FILL,
+        font: "bold 28px JetBrains Mono, monospace",
+        fillColor: Cesium.Color.fromCssColorString("#0891b2"),
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 4,
+        scale: 0.3,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       }
     });
 
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    let lastUpdate = 0;
 
     handler.setInputAction((movement: any) => {
+      const now = Date.now();
+      if (now - lastUpdate < 80) return;
+      lastUpdate = now;
+
       const cartesian = viewer.camera.pickEllipsoid(movement.endPosition, viewer.scene.globe.ellipsoid);
       if (cartesian) {
         const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
@@ -284,7 +336,38 @@ export function useCesiumViewer({
 
     handler.setInputAction((click: any) => {
       const activeWeapon = simStateRef.current.selectedWeapon;
-      if (!activeWeapon) return;
+      
+      if (!activeWeapon) {
+        // Entity picking mode
+        const pickedObject = viewer.scene.pick(click.position);
+        if (Cesium.defined(pickedObject) && pickedObject.id) {
+          const entityId = pickedObject.id.id;
+          
+          // Check nodes
+          const matchedNode = simStateRef.current.nodes.find((n: CriticalNode) => n.id === entityId);
+          if (matchedNode) {
+            if (setSelectedNode) setSelectedNode(matchedNode);
+            if (setSelectedSystem) setSelectedSystem(null);
+            onAddLog(`DOWÓDZTWO: Wybrano węzeł strategiczny: ${matchedNode.name}`, "info");
+            flyToNode(matchedNode.lat, matchedNode.lon, matchedNode.name);
+            return;
+          }
+
+          // Check deployed systems
+          const matchedSystem = simStateRef.current.deployedSystems.find((s: DeployedSystem) => s.id === entityId);
+          if (matchedSystem) {
+            if (setSelectedSystem) setSelectedSystem(matchedSystem);
+            if (setSelectedNode) setSelectedNode(null);
+            onAddLog(`DOWÓDZTWO: Wybrano aktywne pokrycie tarczy: ${matchedSystem.name}`, "info");
+            return;
+          }
+        } else {
+          // Clear selection on empty space click
+          if (setSelectedNode) setSelectedNode(null);
+          if (setSelectedSystem) setSelectedSystem(null);
+        }
+        return;
+      }
 
       const cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
       if (cartesian) {
@@ -315,11 +398,15 @@ export function useCesiumViewer({
           position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
           ellipsoid: {
             radii: new Cesium.Cartesian3(newSys.radius, newSys.radius, newSys.radius),
-            material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.08),
-            outline: true,
-            outlineColor: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.85),
-            slicePartitions: 24,
-            stackPartitions: 12
+            material: new Cesium.GridMaterialProperty({
+              color: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.9),
+              cellAlpha: 0.05,
+              lineCount: new Cesium.Cartesian2(12, 12),
+              thickness: new Cesium.Cartesian2(2.5, 2.5)
+            }),
+            outline: false,
+            minimumCone: 0,
+            maximumCone: Cesium.Math.PI_OVER_TWO
           }
         });
 
@@ -328,47 +415,54 @@ export function useCesiumViewer({
           ellipse: {
             semiMajorAxis: newSys.radius,
             semiMinorAxis: newSys.radius,
-            material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.06),
+            material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.04),
             outline: true,
-            outlineColor: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.4),
+            outlineColor: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.5),
             outlineWidth: 2,
             height: 0
           }
         });
 
+        const deployedGlassColor = Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.25);
+
+        // 1. Sleek Single-Primitive glass launch tower (No outline!)
         viewer.entities.add({
-          position: Cesium.Cartesian3.fromDegrees(lon, lat, 5),
+          id: newSys.id + "_tower",
+          position: Cesium.Cartesian3.fromDegrees(lon, lat, 20),
           cylinder: {
-            length: 10, topRadius: 12, bottomRadius: 14,
-            material: Cesium.Color.fromCssColorString("#334155").withAlpha(0.9),
-            outline: true, outlineColor: Cesium.Color.fromCssColorString(newSys.color)
+            length: 40, topRadius: 10, bottomRadius: 12,
+            slices: 5,
+            material: deployedGlassColor,
+            outline: false
           }
         });
+
+        // 2. Tactical Vertical Beacon Line
         viewer.entities.add({
-          position: Cesium.Cartesian3.fromDegrees(lon, lat, 30),
-          cylinder: {
-            length: 40, topRadius: 2, bottomRadius: 4,
-            material: Cesium.Color.fromCssColorString("#64748b").withAlpha(0.9),
-            outline: true, outlineColor: Cesium.Color.fromCssColorString(newSys.color)
+          id: newSys.id + "_beacon",
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+              lon, lat, 0,
+              lon, lat, 70
+            ]),
+            width: 1.5,
+            material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.8)
           }
         });
+
+        // 3. Primary High-Contrast Supersampled Label
         viewer.entities.add({
-          position: Cesium.Cartesian3.fromDegrees(lon, lat, 55),
-          ellipsoid: {
-            radii: new Cesium.Cartesian3(6, 6, 6),
-            material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.85),
-            outline: true, outlineColor: Cesium.Color.WHITE
-          }
-        });
-        viewer.entities.add({
+          id: newSys.id + "_label",
           position: Cesium.Cartesian3.fromDegrees(lon, lat, 70),
           label: {
-            text: newSys.name,
-            font: "bold 30px Share Tech Mono, monospace",
-            fillColor: Cesium.Color.fromCssColorString(newSys.color),
+            text: newSys.name.toUpperCase(),
+            font: "bold 38px Share Tech Mono, monospace",
+            fillColor: Cesium.Color.fromCssColorString("#0f172a"),
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            outlineColor: Cesium.Color.fromCssColorString("#020617").withAlpha(0.85),
-            outlineWidth: 3, showBackground: false, scale: 0.35,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 5,
+            showBackground: false,
+            scale: 0.32,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
             pixelOffset: new Cesium.Cartesian2(0, -12),
             disableDepthTestDistance: Number.POSITIVE_INFINITY
@@ -394,10 +488,9 @@ export function useCesiumViewer({
       const currentNodes = simStateRef.current.nodes;
       const systems = simStateRef.current.deployedSystems;
 
-      laserLinesRef.current.forEach((line) => {
-        viewer.entities.remove(line);
-      });
-      laserLinesRef.current = [];
+      if (laserLinesRef.current && typeof laserLinesRef.current.removeAll === "function") {
+        laserLinesRef.current.removeAll();
+      }
 
       activeThreats.forEach((threat) => {
         const target = currentNodes.find(n => n.id === threat.targetId);
@@ -442,14 +535,15 @@ export function useCesiumViewer({
               disableDepthTestDistance: Number.POSITIVE_INFINITY
             },
             label: {
-              text: threat.name,
-              font: "8px Share Tech Mono, monospace",
-              fillColor: Cesium.Color.fromCssColorString(colorStr),
-              outlineColor: Cesium.Color.BLACK,
-              outlineWidth: 2,
+              text: threat.name.toUpperCase(),
+              font: "bold 30px Share Tech Mono, monospace",
+              fillColor: Cesium.Color.fromCssColorString("#991b1b"),
+              outlineColor: Cesium.Color.WHITE,
+              outlineWidth: 4,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              scale: 0.33,
               verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-              pixelOffset: new Cesium.Cartesian2(0, -8),
+              pixelOffset: new Cesium.Cartesian2(0, -12),
               disableDepthTestDistance: Number.POSITIVE_INFINITY
             }
           });
@@ -471,16 +565,20 @@ export function useCesiumViewer({
             const pathConfig = THREAT_TYPES[threat.type];
             const activeMatch = sys.type === "PILICA" || (sys.type === "WRE" && !pathConfig.immuneToWRE);
 
-            if (activeMatch) {
-              const laser = viewer.entities.add({
-                polyline: {
-                  positions: [sysPos, threatPos],
-                  width: 3.0,
-                  material: Cesium.Color.fromCssColorString(sys.type === "PILICA" ? "#ff4d4d" : "#3b82f6"),
-                  disableDepthTestDistance: Number.POSITIVE_INFINITY
-                }
+            if (activeMatch && laserLinesRef.current && typeof laserLinesRef.current.add === "function") {
+              const laserColor = sys.type === "PILICA" ? "#ff4d4d" : "#3b82f6";
+              // Neon Outer Glow
+              laserLinesRef.current.add({
+                positions: [sysPos, threatPos],
+                width: 6.0,
+                color: Cesium.Color.fromCssColorString(laserColor).withAlpha(0.35)
               });
-              laserLinesRef.current.push(laser);
+              // Solid Inner Core
+              laserLinesRef.current.add({
+                positions: [sysPos, threatPos],
+                width: 2.0,
+                color: Cesium.Color.WHITE
+              });
 
               const dmg = sys.type === "PILICA" ? 0.9 : 2.5;
               threat.health -= dmg * speed;
@@ -545,6 +643,7 @@ export function useCesiumViewer({
     threatEntitiesRef,
     isCesiumLoaded,
     flyToNode,
-    resetViewer
+    resetViewer,
+    removeDeployedSystem
   };
 }

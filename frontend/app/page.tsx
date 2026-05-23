@@ -17,6 +17,7 @@ import { ArsenalPanel } from "./components/ArsenalPanel";
 import { ThreatMonitor } from "./components/ThreatMonitor";
 import { CommandLogger } from "./components/CommandLogger";
 import { TelemetryHUD } from "./components/TelemetryHUD";
+import { ObjectDetailCard } from "./components/ObjectDetailCard";
 
 export default function SteelSentinelDashboard() {
   const [nodes, setNodes] = useState<CriticalNode[]>(INITIAL_NODES);
@@ -39,6 +40,11 @@ export default function SteelSentinelDashboard() {
   });
   const [coolingSecondsLeft, setCoolingSecondsLeft] = useState<number | null>(null);
   const [waterSecondsLeft, setWaterSecondsLeft] = useState<number | null>(null);
+
+  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [selectedNode, setSelectedNode] = useState<CriticalNode | null>(null);
+  const [selectedSystem, setSelectedSystem] = useState<DeployedSystem | null>(null);
 
   const cesiumContainerRef = useRef<HTMLDivElement>(null);
 
@@ -85,7 +91,8 @@ export default function SteelSentinelDashboard() {
   const {
     nodeEntitiesRef,
     flyToNode,
-    resetViewer
+    resetViewer,
+    removeDeployedSystem
   } = useCesiumViewer({
     containerRef: cesiumContainerRef,
     simStateRef,
@@ -96,7 +103,9 @@ export default function SteelSentinelDashboard() {
     setThreats,
     setNodes,
     setSelectedWeapon: (val) => setSelectedWeapon(val as WeaponType | null),
-    setHoveredCoords
+    setHoveredCoords,
+    setSelectedNode,
+    setSelectedSystem
   });
 
   useCascadingEngine(
@@ -182,13 +191,94 @@ export default function SteelSentinelDashboard() {
     setPlaybookActive(null);
     setCoolingSecondsLeft(null);
     setWaterSecondsLeft(null);
+    setSelectedNode(null);
+    setSelectedSystem(null);
     resetViewer();
     addLog("ZRESETOWANO SYSTEM I PRZESTRZEŃ TAKTYCZNĄ. OBIEKTY PRZYWRÓCONE DO SPRAWNOŚCI.", "success");
   }, [resetViewer, addLog]);
 
   const handleNodeClick = useCallback((node: CriticalNode) => {
+    setSelectedNode(node);
+    setSelectedSystem(null);
     flyToNode(node.lat, node.lon, node.name);
   }, [flyToNode]);
+
+  const handleActivateBackupPower = useCallback((nodeId: string) => {
+    addLog(`SIECI ROZDZIELCZE: Ręczne załączenie agregatu rezerwowego dla węzła ${nodeId}.`, "success");
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === nodeId
+          ? { ...n, backupPower: true, notes: n.notes + " (Awaryjny generator załączony lokalnie z konsoli obiektu)" }
+          : n
+      )
+    );
+    setSelectedNode((prev) => (prev && prev.id === nodeId ? { ...prev, backupPower: true } : prev));
+  }, [addLog]);
+
+  const handleResetCooling = useCallback(() => {
+    addLog("OBJ_02 (Elektrownia): Krytyczne nawadnianie bloku gazowego zainicjowane! Blok chłodzenia zresetowany.", "success");
+    setCoolingSecondsLeft(null);
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === "OBJ_02"
+          ? {
+              ...n,
+              health: 100,
+              status: "OPERATIONAL",
+              notes: "CHŁODZENIE PRZYWRÓCONE: Wymuszono awaryjny obieg wody z zapasów strategicznych."
+            }
+          : n
+      )
+    );
+    setSelectedNode((prev) =>
+      prev && prev.id === "OBJ_02"
+        ? {
+            ...prev,
+            health: 100,
+            status: "OPERATIONAL",
+            notes: "CHŁODZENIE PRZYWRÓCONE: Wymuszono awaryjny obieg wody z zapasów strategicznych."
+          }
+        : prev
+    );
+  }, [addLog, setCoolingSecondsLeft]);
+
+  const handleResetWater = useCallback(() => {
+    addLog("OBJ_03 (Ujęcie Wody): Wymuszono załączenie zapasowych głębinowych pomp wody. Zbiorniki napełnione.", "success");
+    setWaterSecondsLeft(null);
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === "OBJ_03"
+          ? {
+              ...n,
+              health: 100,
+              status: "OPERATIONAL",
+              notes: "REZERWY PEŁNE: Awaryjne napełnianie zakończone sukcesem."
+            }
+          : n
+      )
+    );
+    setSelectedNode((prev) =>
+      prev && prev.id === "OBJ_03"
+        ? {
+            ...prev,
+            health: 100,
+            status: "OPERATIONAL",
+            notes: "REZERWY PEŁNE: Awaryjne napełnianie zakończone sukcesem."
+          }
+        : prev
+    );
+  }, [addLog, setWaterSecondsLeft]);
+
+  const handleRemoveSystem = useCallback((sysId: string) => {
+    const matched = deployedSystems.find((s) => s.id === sysId);
+    if (!matched) return;
+
+    removeDeployedSystem(sysId);
+
+    setDeployedSystems((prev) => prev.filter((s) => s.id !== sysId));
+    setSelectedSystem(null);
+    addLog(`DOWÓDZTWO: Zdemontowano tarczę defensywną ${matched.name}.`, "warning");
+  }, [deployedSystems, removeDeployedSystem, addLog]);
 
   return (
     <div className="flex flex-col flex-1 h-screen relative select-none">
@@ -217,6 +307,8 @@ export default function SteelSentinelDashboard() {
         playbookActive={playbookActive}
         onActivatePlaybook={activatePlaybook}
         onStopPlaybook={() => setPlaybookActive(null)}
+        isOpen={leftSidebarOpen}
+        onToggle={() => setLeftSidebarOpen(!leftSidebarOpen)}
       />
 
       <ArsenalPanel
@@ -237,13 +329,31 @@ export default function SteelSentinelDashboard() {
           addLog(`SYMULATOR: ${simSpeed === 0 ? "WZNOWIONY" : "WSTRZYMANY"}`, "info");
         }}
         onAddLog={addLog}
+        isOpen={rightSidebarOpen}
+        onToggle={() => setRightSidebarOpen(!rightSidebarOpen)}
       />
 
-      <ThreatMonitor threats={threats} nodes={nodes} />
+      <ThreatMonitor threats={threats} nodes={nodes} isOpen={leftSidebarOpen} />
 
-      <CommandLogger logs={logs} clockTime={clockTime} />
+      <CommandLogger logs={logs} clockTime={clockTime} isOpen={rightSidebarOpen} />
 
       <TelemetryHUD hoveredCoords={hoveredCoords} />
+
+      <ObjectDetailCard
+        selectedNode={selectedNode}
+        selectedSystem={selectedSystem}
+        onClose={() => {
+          setSelectedNode(null);
+          setSelectedSystem(null);
+        }}
+        onActivateBackupPower={handleActivateBackupPower}
+        coolingSecondsLeft={coolingSecondsLeft}
+        waterSecondsLeft={waterSecondsLeft}
+        onResetCooling={handleResetCooling}
+        onResetWater={handleResetWater}
+        onRemoveSystem={handleRemoveSystem}
+        onFlyTo={flyToNode}
+      />
     </div>
   );
 }

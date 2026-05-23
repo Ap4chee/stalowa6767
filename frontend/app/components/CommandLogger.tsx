@@ -5,11 +5,14 @@ import { LogEntry } from "../types";
 interface CommandLoggerProps {
   logs: LogEntry[];
   clockTime: string;
+  isOpen: boolean;
 }
 
-export function CommandLogger({ logs, clockTime }: CommandLoggerProps) {
+export function CommandLogger({ logs, clockTime, isOpen }: CommandLoggerProps) {
   return (
-    <section className="fixed right-4 bottom-4 w-96 h-36 z-40 font-mono bg-slate-950/95 border border-slate-800/80 p-3 clip-chamfer text-[11px] shadow-2xl backdrop-blur-md flex flex-col">
+    <section className={`fixed right-4 bottom-4 w-96 h-36 z-40 font-mono bg-slate-950/95 border border-slate-800/80 p-3 clip-chamfer text-[11px] shadow-2xl backdrop-blur-md flex flex-col transition-all duration-300 ease-in-out ${
+      isOpen ? "translate-x-0" : "translate-x-[420px]"
+    }`}>
       <div className="text-[10px] text-slate-400 font-rajdhani tracking-wider pb-1 border-b border-slate-900 flex justify-between items-center mb-1">
         <span>KONSOLA ZDARZEŃ BOJOWYCH I ALARMOWYCH</span>
         <span className="text-[8px] text-slate-500 font-sharetech">SECURE FEED // STW_COP</span>

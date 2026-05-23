@@ -13,6 +13,8 @@ interface ArsenalPanelProps {
   simSpeed: number;
   onTogglePause: () => void;
   onAddLog: (text: string, type: LogType) => void;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
 export function ArsenalPanel({
@@ -24,10 +26,24 @@ export function ArsenalPanel({
   onReset,
   simSpeed,
   onTogglePause,
-  onAddLog
+  onAddLog,
+  isOpen,
+  onToggle
 }: ArsenalPanelProps) {
   return (
-    <aside className="fixed right-4 top-20 w-80 h-[calc(100vh-230px)] z-40 flex flex-col gap-3 font-mono bg-slate-950/90 border border-slate-800/80 p-3 clip-chamfer text-[11px] shadow-2xl backdrop-blur-md">
+    <aside className={`fixed right-4 top-20 w-80 h-[calc(100vh-230px)] z-40 flex flex-col gap-3 font-mono bg-slate-950/90 border border-slate-800/80 p-3 clip-chamfer text-[11px] shadow-2xl backdrop-blur-md transition-all duration-300 ease-in-out ${
+      isOpen ? "translate-x-0" : "translate-x-[340px]"
+    }`}>
+      {/* Premium vertical pull-out tab */}
+      <button
+        onClick={onToggle}
+        className="absolute top-1/2 -left-8 -translate-y-1/2 w-8 h-24 bg-slate-950/95 border border-slate-800/80 border-r-0 text-cyan-400 hover:text-cyan-300 font-bold font-rajdhani flex items-center justify-center rounded-l-md transition-all shadow-xl z-50 cursor-pointer hover:bg-slate-900/90"
+      >
+        <span className="transform -rotate-90 text-[9px] tracking-[0.2em] whitespace-nowrap">
+          {isOpen ? "UKRYJ" : "ARSENAŁ"}
+        </span>
+      </button>
+
       <div className="flex flex-col gap-1.5 flex-1">
         <div className="text-[10px] text-slate-400 font-rajdhani tracking-wider pb-1 border-b border-slate-900 flex justify-between items-center">
           <span>ARSENAŁ DEFENSYWNY (KLIKNIJ I ROZSTAW)</span>
