@@ -10,7 +10,7 @@ export function AlertTicker({ threats }: AlertTickerProps) {
   const hasActiveThreats = threats.filter(t => t.status === "FLYING").length > 0;
 
   return (
-    <div className="fixed top-12 left-0 w-full h-6 theme-bg-panel border-b theme-border z-[55] flex items-center font-mono">
+    <div className="fixed top-12 left-0 w-full h-6 theme-bg-panel border-b theme-border z-[55] flex items-center font-mono backdrop-blur-md">
       <div className="theme-bg-button px-3 h-full flex items-center text-[9px] theme-text-primary font-bold border-r theme-border font-rajdhani tracking-wider">
         TACTICAL FEED
       </div>

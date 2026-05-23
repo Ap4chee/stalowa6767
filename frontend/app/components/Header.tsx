@@ -26,7 +26,7 @@ export function Header({
   onToggleTheme,
 }: HeaderProps) {
   return (
-    <header className="fixed top-0 left-0 w-full z-[60] flex justify-between items-center px-4 h-12 border-b theme-border theme-bg-panel font-rajdhani">
+    <header className="fixed top-0 left-0 w-full z-[60] flex justify-between items-center px-4 h-12 border-b theme-border theme-bg-panel font-rajdhani backdrop-blur-md">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 theme-neon-text animate-pulse" />
