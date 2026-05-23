@@ -221,7 +221,7 @@ export function DependencyFlow({ nodes, onFlyTo, theme = "light" }: DependencyFl
   return (
     <div className="w-full h-full min-h-0 theme-bg-app relative select-none">
       {/* Decorative top glass bar */}
-      <div className="absolute top-2 left-2 z-10 p-2 border theme-border theme-bg-panel font-mono text-[9px] theme-text-secondary clip-chamfer shadow-lg flex flex-col gap-0.5">
+      <div className="absolute top-3 left-3 z-10 p-2 border theme-border theme-bg-panel font-mono text-[9px] theme-text-secondary clip-chamfer shadow-lg flex flex-col gap-0.5">
         <div className="flex items-center gap-1.5 font-bold font-rajdhani theme-neon-text text-[10px]">
           <span className="w-1.5 h-1.5 rounded-full theme-neon-bg animate-ping" />
           <span>DIAGRAM TOPOLOGII SIECI PRZESYŁOWYCH</span>
@@ -250,8 +250,8 @@ export function DependencyFlow({ nodes, onFlyTo, theme = "light" }: DependencyFl
         <Controls
           className="theme-bg-panel border theme-border theme-neon-text shadow-md font-mono text-[10px]"
           style={{
-            bottom: "10px",
-            left: "10px",
+            bottom: "24px",
+            left: "24px",
             display: "flex",
             flexDirection: "row",
             gap: "2px"
@@ -264,8 +264,8 @@ export function DependencyFlow({ nodes, onFlyTo, theme = "light" }: DependencyFl
           }}
           maskColor={theme === "light" ? "rgba(248, 250, 252, 0.6)" : "rgba(2, 6, 23, 0.7)"}
           style={{
-            bottom: "10px",
-            right: "10px",
+            bottom: "24px",
+            right: "24px",
             border: "1px solid var(--border-panel)",
             background: "var(--bg-app)",
             width: 100,

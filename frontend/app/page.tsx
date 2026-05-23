@@ -358,7 +358,7 @@ export default function SteelSentinelDashboard() {
       <AlertTicker threats={threats} />
 
       {schemaModeEnabled && (
-        <div className="fixed top-12 bottom-0 left-0 right-0 z-20 theme-bg-app flex flex-col transition-all duration-500 ease-in-out">
+        <div className="fixed top-[72px] bottom-0 left-0 right-0 z-20 theme-bg-app flex flex-col transition-all duration-500 ease-in-out">
           <DependencyFlow
             nodes={nodes}
             theme={theme}
