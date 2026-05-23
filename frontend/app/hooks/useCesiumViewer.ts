@@ -18,6 +18,7 @@ interface UseCesiumViewerOptions {
   setHoveredCoords: (val: HoveredCoords) => void;
   setSelectedNode?: (node: CriticalNode | null) => void;
   setSelectedSystem?: (sys: DeployedSystem | null) => void;
+  theme?: "light" | "dark";
 }
 
 export function useCesiumViewer({
@@ -32,7 +33,8 @@ export function useCesiumViewer({
   setSelectedWeapon,
   setHoveredCoords,
   setSelectedNode,
-  setSelectedSystem
+  setSelectedSystem,
+  theme = "light"
 }: UseCesiumViewerOptions) {
   const viewerRef = useRef<any>(null);
   const nodeEntitiesRef = useRef<{ [id: string]: any }>({});
@@ -126,18 +128,10 @@ export function useCesiumViewer({
     viewerRef.current = viewer;
     setIsCesiumLoaded(true);
 
-    viewer.imageryLayers.addImageryProvider(
-      new Cesium.UrlTemplateImageryProvider({
-        url: "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png",
-        credit: "CartoDB",
-        maximumLevel: 19
-      })
-    );
-
     const laserCollection = viewer.scene.primitives.add(new Cesium.PolylineCollection());
     laserLinesRef.current = laserCollection;
 
-    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#f3f4f6");
+    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString(theme === "dark" ? "#020617" : "#f8fafc");
     viewer.scene.skyAtmosphere.show = false;
     viewer.scene.fog.enabled = false;
     viewer.scene.globe.showGroundAtmosphere = false;
@@ -635,6 +629,34 @@ export function useCesiumViewer({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Dynamic Imagery & Theme Swapper for the 3D GIS terrain
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const Cesium = (window as any).Cesium;
+    if (!viewer || !Cesium || !isCesiumLoaded) return;
+
+    // 1. Remove all old layers
+    viewer.imageryLayers.removeAll();
+
+    // 2. Add the dynamic light/dark CartoDB tiles
+    const url = theme === "dark"
+      ? "https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png"
+      : "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png";
+
+    viewer.imageryLayers.addImageryProvider(
+      new Cesium.UrlTemplateImageryProvider({
+        url,
+        credit: "CartoDB",
+        maximumLevel: 19
+      })
+    );
+
+    // 3. Update the globe background base color
+    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString(
+      theme === "dark" ? "#020617" : "#f8fafc"
+    );
+  }, [theme, isCesiumLoaded]);
 
   return {
     viewerRef,

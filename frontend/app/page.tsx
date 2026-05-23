@@ -18,6 +18,7 @@ import { ThreatMonitor } from "./components/ThreatMonitor";
 import { CommandLogger } from "./components/CommandLogger";
 import { TelemetryHUD } from "./components/TelemetryHUD";
 import { ObjectDetailCard } from "./components/ObjectDetailCard";
+import { DependencyFlow } from "./components/DependencyFlow";
 
 export default function SteelSentinelDashboard() {
   const [nodes, setNodes] = useState<CriticalNode[]>(INITIAL_NODES);
@@ -41,8 +42,31 @@ export default function SteelSentinelDashboard() {
   const [coolingSecondsLeft, setCoolingSecondsLeft] = useState<number | null>(null);
   const [waterSecondsLeft, setWaterSecondsLeft] = useState<number | null>(null);
 
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
-  const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
+  const [radarCollapsed, setRadarCollapsed] = useState(false);
+  const [loggerCollapsed, setLoggerCollapsed] = useState(false);
+  const [schemaModeEnabled, setSchemaModeEnabled] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  // Sync theme on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("steel-sentinel-theme") as "light" | "dark" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  // Update theme class and save to localStorage
+  useEffect(() => {
+    if (theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+    localStorage.setItem("steel-sentinel-theme", theme);
+  }, [theme]);
+
   const [selectedNode, setSelectedNode] = useState<CriticalNode | null>(null);
   const [selectedSystem, setSelectedSystem] = useState<DeployedSystem | null>(null);
 
@@ -89,6 +113,7 @@ export default function SteelSentinelDashboard() {
   }, [playBeep]);
 
   const {
+    viewerRef,
     nodeEntitiesRef,
     flyToNode,
     resetViewer,
@@ -105,8 +130,18 @@ export default function SteelSentinelDashboard() {
     setSelectedWeapon: (val) => setSelectedWeapon(val as WeaponType | null),
     setHoveredCoords,
     setSelectedNode,
-    setSelectedSystem
+    setSelectedSystem,
+    theme
   });
+
+  useEffect(() => {
+    if (viewerRef.current) {
+      const timeout = setTimeout(() => {
+        viewerRef.current.resize();
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [schemaModeEnabled, viewerRef]);
 
   useCascadingEngine(
     nodes, setNodes, simSpeed,
@@ -291,53 +326,110 @@ export default function SteelSentinelDashboard() {
           addLog(`DŹWIĘKI SYSTEMOWE: ${!soundEnabled ? "WŁĄCZONE" : "WYŁĄCZONE"}`, "info");
         }}
         onAddLog={addLog}
+        schemaModeEnabled={schemaModeEnabled}
+        onToggleSchemaMode={() => {
+          setSchemaModeEnabled(!schemaModeEnabled);
+          addLog(`WIZUALIZACJA SIECI: Przełączono podgląd schematu na ${!schemaModeEnabled ? "AKTYWNY" : "NIEAKTYWNY"}.`, "info");
+        }}
+        theme={theme}
+        onToggleTheme={() => {
+          const nextTheme = theme === "light" ? "dark" : "light";
+          setTheme(nextTheme);
+          addLog(`MOTYW SYSTEMOWY: Zmieniono motyw graficzny na ${nextTheme === "light" ? "JASNY" : "CIEMNY"}.`, "info");
+        }}
       />
 
       <AlertTicker threats={threats} />
 
-      <CesiumViewport cesiumContainerRef={cesiumContainerRef} />
+      {schemaModeEnabled && (
+        <div className="fixed top-12 bottom-0 left-0 right-0 z-20 theme-bg-app flex flex-col transition-all duration-500 ease-in-out">
+          <DependencyFlow
+            nodes={nodes}
+            theme={theme}
+            onFlyTo={(lat, lon, name) => {
+              // Automatically switch back to 3D map view
+              setSchemaModeEnabled(false);
+              const matched = nodes.find(n => n.name === name);
+              if (matched) {
+                setSelectedNode(matched);
+                setSelectedSystem(null);
+              }
+              // Wait slightly for the view transition to start before camera fly
+              setTimeout(() => {
+                flyToNode(lat, lon, name);
+              }, 100);
+            }}
+          />
+        </div>
+      )}
 
-      <LeftSidebar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        nodes={nodes}
-        coolingSecondsLeft={coolingSecondsLeft}
-        waterSecondsLeft={waterSecondsLeft}
-        onNodeClick={handleNodeClick}
-        playbookActive={playbookActive}
-        onActivatePlaybook={activatePlaybook}
-        onStopPlaybook={() => setPlaybookActive(null)}
-        isOpen={leftSidebarOpen}
-        onToggle={() => setLeftSidebarOpen(!leftSidebarOpen)}
-      />
+      <CesiumViewport cesiumContainerRef={cesiumContainerRef} isSplitScreen={schemaModeEnabled} />
 
-      <ArsenalPanel
-        weapons={WEAPONS}
-        deployedSystems={deployedSystems}
-        selectedWeapon={selectedWeapon}
-        onSelectWeapon={(type) => {
-          setSelectedWeapon(type);
-          if (type) {
-            addLog(`DOWÓDZTWO: Wybrano ${WEAPONS.find(w => w.type === type)?.name} do instalacji. Wskaż punkt na mapie 3D.`, "info");
-          }
-        }}
-        onLaunchScenario={launchScenario}
-        onReset={handleReset}
-        simSpeed={simSpeed}
-        onTogglePause={() => {
-          setSimSpeed(simSpeed === 0 ? 1 : 0);
-          addLog(`SYMULATOR: ${simSpeed === 0 ? "WZNOWIONY" : "WSTRZYMANY"}`, "info");
-        }}
-        onAddLog={addLog}
-        isOpen={rightSidebarOpen}
-        onToggle={() => setRightSidebarOpen(!rightSidebarOpen)}
-      />
+      {/* Unified Left Sidebar Column */}
+      {!schemaModeEnabled && (
+        <div className="fixed left-4 top-20 bottom-4 w-80 z-40 flex flex-col gap-3 pointer-events-none">
+          <div className="pointer-events-auto flex flex-col gap-3 h-full min-h-0">
+            <LeftSidebar
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              nodes={nodes}
+              coolingSecondsLeft={coolingSecondsLeft}
+              waterSecondsLeft={waterSecondsLeft}
+              onNodeClick={handleNodeClick}
+              playbookActive={playbookActive}
+              onActivatePlaybook={activatePlaybook}
+              onStopPlaybook={() => setPlaybookActive(null)}
+              isCollapsed={leftPanelCollapsed}
+              onToggle={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+            />
 
-      <ThreatMonitor threats={threats} nodes={nodes} isOpen={leftSidebarOpen} />
+            <ThreatMonitor
+              threats={threats}
+              nodes={nodes}
+              isCollapsed={radarCollapsed}
+              onToggle={() => setRadarCollapsed(!radarCollapsed)}
+            />
+          </div>
+        </div>
+      )}
 
-      <CommandLogger logs={logs} clockTime={clockTime} isOpen={rightSidebarOpen} />
+      {/* Unified Right Sidebar Column */}
+      {!schemaModeEnabled && (
+        <div className="fixed right-4 top-20 bottom-4 w-80 z-40 flex flex-col gap-3 pointer-events-none">
+          <div className="pointer-events-auto flex flex-col gap-3 h-full min-h-0">
+            <ArsenalPanel
+              weapons={WEAPONS}
+              deployedSystems={deployedSystems}
+              selectedWeapon={selectedWeapon}
+              onSelectWeapon={(type) => {
+                setSelectedWeapon(type);
+                if (type) {
+                  addLog(`DOWÓDZTWO: Wybrano ${WEAPONS.find(w => w.type === type)?.name} do instalacji. Wskaż punkt na mapie 3D.`, "info");
+                }
+              }}
+              onLaunchScenario={launchScenario}
+              onReset={handleReset}
+              simSpeed={simSpeed}
+              onTogglePause={() => {
+                setSimSpeed(simSpeed === 0 ? 1 : 0);
+                addLog(`SYMULATOR: ${simSpeed === 0 ? "WZNOWIONY" : "WSTRZYMANY"}`, "info");
+              }}
+              onAddLog={addLog}
+              isCollapsed={rightPanelCollapsed}
+              onToggle={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+            />
 
-      <TelemetryHUD hoveredCoords={hoveredCoords} />
+            <CommandLogger
+              logs={logs}
+              clockTime={clockTime}
+              isCollapsed={loggerCollapsed}
+              onToggle={() => setLoggerCollapsed(!loggerCollapsed)}
+            />
+          </div>
+        </div>
+      )}
+
+      {!schemaModeEnabled && <TelemetryHUD hoveredCoords={hoveredCoords} />}
 
       <ObjectDetailCard
         selectedNode={selectedNode}
@@ -353,6 +445,7 @@ export default function SteelSentinelDashboard() {
         onResetWater={handleResetWater}
         onRemoveSystem={handleRemoveSystem}
         onFlyTo={flyToNode}
+        leftSidebarCollapsed={leftPanelCollapsed}
       />
     </div>
   );

@@ -3,16 +3,103 @@
 
 
 :root {
-  --background: #020617; /* Slate-950 */
-  --foreground: #e2e8f0;
+  /* LIGHT MODE (Default) - Hyper-premium High-Tech Digital Twin theme */
+  --bg-app: #f8fafc; /* Cleanest Slate-50 background */
+  --bg-panel: rgba(255, 255, 255, 0.88); /* Semi-transparent brilliant white glass */
+  --bg-panel-hover: rgba(241, 245, 249, 0.9);
+  --border-panel: #cbd5e1; /* Elegant, thin Slate-300 borders (no heavy dark frames) */
+  --text-primary: #0f172a; /* Premium Slate-900 for soft, highly-readable text */
+  --text-secondary: #334155; /* Soft Slate-700 for descriptions and details */
+  --text-muted: #64748b; /* Slate-500 for micro-telemetry and secondary logs */
+  --neon-cyan: #0891b2; /* High-contrast Tactical Cyan-600 for active neon states */
+  --neon-accent: #0d9488; /* Tactical Teal-600 */
+  --bg-button: #f1f5f9; /* Clean, light Slate-100 buttons (no concrete gray look) */
+  --bg-button-hover: #e2e8f0; /* Soft Slate-200 hover state */
+  --grid-color: rgba(15, 23, 42, 0.04);
+}
+
+.dark {
+  /* DARK MODE - Premium Tactical HUD theme */
+  --bg-app: #020617; /* Deepest Slate-950 */
+  --bg-panel: rgba(2, 6, 23, 0.9); /* Deep slate-950 transparent glass */
+  --bg-panel-hover: rgba(15, 23, 42, 0.6);
+  --border-panel: #1e293b; /* Slate-800 */
+  --text-primary: #e2e8f0; /* Slate-200 */
+  --text-secondary: #94a3b8; /* Slate-400 */
+  --text-muted: #64748b; /* Slate-500 */
+  --neon-cyan: #06b6d4; /* Vibrant Electric Cyan */
+  --neon-accent: #14b8a6; /* Vibrant Teal */
+  --bg-button: #0f172a;
+  --bg-button-hover: #1e293b;
+  --grid-color: rgba(148, 163, 184, 0.08);
 }
 
 body {
-  background-color: #020617;
-  color: #e2e8f0;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
   font-family: 'JetBrains Mono', 'Share Tech Mono', monospace;
   overflow: hidden;
   height: 100vh;
+  transition: background-color 300ms ease, color 300ms ease;
+}
+
+/* Theme-aware layout classes */
+.theme-bg-app {
+  background-color: var(--bg-app);
+  transition: background-color 300ms ease, color 300ms ease;
+}
+
+.theme-bg-panel {
+  background-color: var(--bg-panel);
+  transition: background-color 300ms ease, border-color 300ms ease;
+}
+
+.theme-bg-panel-hover:hover {
+  background-color: var(--bg-panel-hover);
+}
+
+.theme-border {
+  border-color: var(--border-panel) !important;
+  transition: border-color 300ms ease;
+}
+
+.theme-text-primary {
+  color: var(--text-primary);
+  transition: color 300ms ease;
+}
+
+.theme-text-secondary {
+  color: var(--text-secondary);
+  transition: color 300ms ease;
+}
+
+.theme-text-muted {
+  color: var(--text-muted);
+  transition: color 300ms ease;
+}
+
+.theme-neon-text {
+  color: var(--neon-cyan);
+  transition: color 300ms ease;
+}
+
+.theme-neon-border {
+  border-color: var(--neon-cyan) !important;
+  transition: border-color 300ms ease;
+}
+
+.theme-neon-bg {
+  background-color: var(--neon-cyan);
+  transition: background-color 300ms ease;
+}
+
+.theme-bg-button {
+  background-color: var(--bg-button);
+  transition: background-color 300ms ease;
+}
+
+.theme-bg-button:hover {
+  background-color: var(--bg-button-hover);
 }
 
 
@@ -67,8 +154,11 @@ body {
   background-size: 40px 40px;
 }
 
-/* Military corner clips */
+/* Military corner clips with custom border hack for clip-path */
 .clip-chamfer {
+  position: relative;
+  background-color: transparent !important;
+  border: none !important;
   clip-path: polygon(
     0px 8px, 
     8px 0px, 
@@ -79,6 +169,32 @@ body {
     8px 100%, 
     0px calc(100% - 8px)
   );
+}
+
+.clip-chamfer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--border-panel);
+  z-index: -2;
+  clip-path: inherit;
+  pointer-events: none;
+}
+
+.clip-chamfer::after {
+  content: "";
+  position: absolute;
+  inset: 1px; /* Perfect 1px border stroke */
+  background-color: var(--bg-panel);
+  z-index: -1;
+  clip-path: inherit;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+  transition: background-color 300ms ease;
+}
+
+.clip-chamfer:hover::after {
+  background-color: var(--bg-panel-hover);
 }
 
 .clip-chamfer-lg {
