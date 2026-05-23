@@ -382,8 +382,6 @@ export default function SteelSentinelDashboard() {
       <CesiumViewport 
         cesiumContainerRef={cesiumContainerRef} 
         isSplitScreen={schemaModeEnabled}
-        mapLayers={mapLayers}
-        onToggleLayer={handleToggleLayer}
       />
 
       {/* Unified Left Sidebar Column */}
@@ -450,7 +448,13 @@ export default function SteelSentinelDashboard() {
         </div>
       )}
 
-      {!schemaModeEnabled && <TelemetryHUD hoveredCoords={hoveredCoords} />}
+      {!schemaModeEnabled && (
+        <TelemetryHUD 
+          hoveredCoords={hoveredCoords} 
+          mapLayers={mapLayers}
+          onToggleLayer={handleToggleLayer}
+        />
+      )}
 
       <ObjectDetailCard
         selectedNode={selectedNode}
