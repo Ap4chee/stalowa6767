@@ -785,10 +785,7 @@ export default function SteelSentinelDashboard() {
           ellipsoid: {
             radii: new Cesium.Cartesian3(newSys.radius, newSys.radius, newSys.radius),
             material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.08),
-            outline: true,
-            outlineColor: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.5),
-            slicePartitions: 32,
-            stackPartitions: 16,
+            outline: false,
             minimumCone: 0,
             maximumCone: Cesium.Math.PI_OVER_TWO // Only top hemisphere
           }
@@ -1759,7 +1756,7 @@ export default function SteelSentinelDashboard() {
             </div>
           ))}
           <div className="flex gap-2">
-            <span className="text-cyan-500/80 font-bold">[{new Date().toTimeString().split(" ")[0]}]</span>
+            <span className="text-cyan-500/80 font-bold">[{clockTime || "--:--:--"}]</span>
             <span className="w-1.5 h-3 bg-cyan-400 animate-pulse" />
           </div>
         </div>
