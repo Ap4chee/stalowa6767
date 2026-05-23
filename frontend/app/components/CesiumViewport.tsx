@@ -35,7 +35,10 @@ export function CesiumViewport({
       />
       
       {/* Interactive Tactical GIS Layer Controller */}
-      <div className="absolute top-20 left-[352px] z-30 font-mono flex flex-col gap-2 border theme-border theme-bg-panel p-3 clip-chamfer theme-text-secondary shadow-xl w-64 pointer-events-auto">
+      <div 
+        style={{ top: "80px", left: "352px", position: "absolute" }}
+        className="z-30 font-mono flex flex-col gap-2 border theme-border theme-bg-panel p-3 rounded-lg theme-text-secondary shadow-xl w-64 pointer-events-auto"
+      >
         {/* Header */}
         <div className="flex justify-between items-center border-b theme-border pb-2">
           <div className="flex flex-col">
