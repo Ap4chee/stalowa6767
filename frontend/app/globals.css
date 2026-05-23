@@ -5,15 +5,15 @@
 :root {
   /* LIGHT MODE (Default) - Hyper-premium High-Tech Digital Twin theme */
   --bg-app: #f8fafc; /* Cleanest Slate-50 background */
-  --bg-panel: rgba(255, 255, 255, 0.88); /* Semi-transparent brilliant white glass */
-  --bg-panel-hover: rgba(241, 245, 249, 0.9);
-  --border-panel: #cbd5e1; /* Elegant, thin Slate-300 borders (no heavy dark frames) */
+  --bg-panel: rgba(255, 255, 255, 0.96); /* Elegant, highly-stable white glass for premium contrast */
+  --bg-panel-hover: rgba(241, 245, 249, 0.96); /* Extremely subtle Slate-100 hover */
+  --border-panel: #cbd5e1; /* Elegant, thin Slate-300 borders */
   --text-primary: #0f172a; /* Premium Slate-900 for soft, highly-readable text */
   --text-secondary: #334155; /* Soft Slate-700 for descriptions and details */
   --text-muted: #64748b; /* Slate-500 for micro-telemetry and secondary logs */
   --neon-cyan: #0891b2; /* High-contrast Tactical Cyan-600 for active neon states */
   --neon-accent: #0d9488; /* Tactical Teal-600 */
-  --bg-button: #f1f5f9; /* Clean, light Slate-100 buttons (no concrete gray look) */
+  --bg-button: #f1f5f9; /* Clean, light Slate-100 buttons */
   --bg-button-hover: #e2e8f0; /* Soft Slate-200 hover state */
   --grid-color: rgba(15, 23, 42, 0.04);
 }
@@ -21,8 +21,8 @@
 .dark {
   /* DARK MODE - Premium Tactical HUD theme */
   --bg-app: #020617; /* Deepest Slate-950 */
-  --bg-panel: rgba(2, 6, 23, 0.9); /* Deep slate-950 transparent glass */
-  --bg-panel-hover: rgba(15, 23, 42, 0.6);
+  --bg-panel: rgba(10, 15, 30, 0.96); /* Stable, rich deep-slate glass to avoid background bleed-through */
+  --bg-panel-hover: rgba(22, 32, 58, 0.96); /* Very subtle, high-contrast Slate-800 hover */
   --border-panel: #1e293b; /* Slate-800 */
   --text-primary: #e2e8f0; /* Slate-200 */
   --text-secondary: #94a3b8; /* Slate-400 */
@@ -191,10 +191,6 @@ body {
   pointer-events: none;
   backdrop-filter: blur(12px);
   transition: background-color 300ms ease;
-}
-
-.clip-chamfer:hover::after {
-  background-color: var(--bg-panel-hover);
 }
 
 .clip-chamfer-lg {

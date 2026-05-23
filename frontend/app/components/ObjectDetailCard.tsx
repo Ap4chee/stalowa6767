@@ -1,6 +1,7 @@
 "use client";
 
-import { X, BatteryCharging, ShieldAlert, Navigation, Settings2, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, BatteryCharging, ShieldAlert, Navigation, Settings2, Trash2, RotateCcw } from "lucide-react";
 import { CriticalNode, DeployedSystem, WeaponType } from "../types";
 import { WEAPONS } from "../data/weapons";
 
@@ -31,6 +32,103 @@ export function ObjectDetailCard({
   onFlyTo,
   leftSidebarCollapsed = false
 }: ObjectDetailCardProps) {
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({ startX: 0, startY: 0, posX: 0, posY: 0 });
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Load persisted position from localStorage if it exists
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("spaceshield_detail_card_pos");
+      if (saved) {
+        setPosition(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Failed to load position from localStorage", e);
+    }
+  }, []);
+
+  // Sync position to localStorage
+  const savePosition = (pos: { x: number; y: number } | null) => {
+    setPosition(pos);
+    try {
+      if (pos) {
+        localStorage.setItem("spaceshield_detail_card_pos", JSON.stringify(pos));
+      } else {
+        localStorage.removeItem("spaceshield_detail_card_pos");
+      }
+    } catch (e) {
+      console.error("Failed to save position to localStorage", e);
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only drag on left click or touch
+    if (e.button !== 0) return;
+    
+    // Don't drag if clicking buttons, links or interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("input") || target.closest("a") || target.closest("svg")) {
+      return;
+    }
+
+    if (cardRef.current) {
+      const rect = cardRef.current.getBoundingClientRect();
+      dragStartRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        posX: rect.left,
+        posY: rect.top
+      };
+      setIsDragging(true);
+      
+      // Prevent text selection while dragging
+      e.preventDefault();
+      // Capture pointer so it continues tracking even outside the window
+      target.setPointerCapture(e.pointerId);
+    }
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const deltaX = e.clientX - dragStartRef.current.startX;
+      const deltaY = e.clientY - dragStartRef.current.startY;
+      
+      let newX = dragStartRef.current.posX + deltaX;
+      let newY = dragStartRef.current.posY + deltaY;
+
+      // Keep it within screen bounds with nice padding
+      const padding = 20;
+      const cardWidth = 400; // w-[400px]
+      
+      newX = Math.max(padding, Math.min(window.innerWidth - cardWidth - padding, newX));
+      newY = Math.max(padding, Math.min(window.innerHeight - 100, newY));
+
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+      
+      // Save final position to localStorage
+      if (cardRef.current) {
+        const rect = cardRef.current.getBoundingClientRect();
+        savePosition({ x: rect.left, y: rect.top });
+      }
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [isDragging]);
+
   if (!selectedNode && !selectedSystem) return null;
 
   const handleBackupClick = () => {
@@ -46,12 +144,31 @@ export function ObjectDetailCard({
   };
 
   return (
-    <div className={`fixed top-20 w-[400px] z-50 font-mono theme-bg-panel border theme-border p-4 clip-chamfer shadow-2xl backdrop-blur-md flex flex-col gap-3 transition-all duration-300 ${
-      leftSidebarCollapsed ? "left-6" : "left-[360px]"
-    }`}>
+    <div 
+      ref={cardRef}
+      style={
+        position
+          ? {
+              left: `${position.x}px`,
+              top: `${position.y}px`,
+              transition: isDragging ? "none" : "left 0.3s ease, top 0.3s ease"
+            }
+          : {}
+      }
+      className={`fixed w-[400px] z-50 font-mono theme-bg-panel border theme-border p-4 clip-chamfer shadow-2xl backdrop-blur-md flex flex-col gap-3 ${
+        isDragging ? "select-none" : ""
+      } ${
+        position ? "" : `top-20 transition-all duration-300 ${leftSidebarCollapsed ? "left-6" : "left-[360px]"}`
+      }`}
+    >
       
       {/* Header */}
-      <div className="flex justify-between items-start border-b theme-border pb-2">
+      <div 
+        onPointerDown={handlePointerDown}
+        onDoubleClick={() => savePosition(null)}
+        className="flex justify-between items-start border-b theme-border pb-2 cursor-grab select-none active:cursor-grabbing"
+        title="Przeciągnij, aby przesunąć. Kliknij dwukrotnie, aby zresetować pozycję."
+      >
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
             <span className="text-[10px] theme-neon-text/80 font-bold tracking-wider font-rajdhani">
@@ -65,12 +182,23 @@ export function ObjectDetailCard({
             {selectedNode ? selectedNode.name : selectedSystem?.name}
           </h3>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 hover:theme-bg-panel-hover theme-text-muted hover:theme-text-primary rounded border border-transparent hover:theme-border transition-all cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {position && (
+            <button
+              onClick={() => savePosition(null)}
+              className="p-1 hover:theme-bg-panel-hover theme-text-muted hover:theme-text-primary rounded border border-transparent hover:theme-border transition-all cursor-pointer"
+              title="Zresetuj pozycję do domyślnej"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="p-1 hover:theme-bg-panel-hover theme-text-muted hover:theme-text-primary rounded border border-transparent hover:theme-border transition-all cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Render Node Details */}
