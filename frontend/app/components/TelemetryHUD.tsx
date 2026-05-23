@@ -8,7 +8,10 @@ interface TelemetryHUDProps {
 
 export function TelemetryHUD({ hoveredCoords }: TelemetryHUDProps) {
   return (
-    <footer className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 px-6 py-2 theme-bg-panel border theme-border flex gap-6 text-[10px] font-mono shadow-2xl backdrop-blur-md clip-chamfer theme-text-secondary">
+    <footer 
+      style={{ bottom: "16px", left: "50%", transform: "translateX(-50%)", position: "fixed" }}
+      className="z-50 px-6 py-2 theme-bg-panel border theme-border flex gap-6 text-[10px] font-mono shadow-2xl backdrop-blur-md clip-chamfer theme-text-secondary"
+    >
       <div className="flex flex-col">
         <span className="theme-text-muted text-[8px] font-bold font-rajdhani tracking-wider">CESIUM COORDINATES</span>
         <span className="theme-neon-text font-bold tabular-nums">
