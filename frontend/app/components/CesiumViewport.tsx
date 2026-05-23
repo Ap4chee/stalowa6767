@@ -12,7 +12,7 @@ export function CesiumViewport({
   isSplitScreen = false
 }: CesiumViewportProps) {
   return (
-    <main className={`fixed inset-0 pt-[72px] z-10 bg-slate-950 transition-all duration-500 ease-in-out ${
+    <main className={`fixed inset-0 z-10 bg-slate-950 transition-all duration-500 ease-in-out ${
       isSplitScreen ? "opacity-0 pointer-events-none invisible" : "opacity-100"
     }`}>
       <div
