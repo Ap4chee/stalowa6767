@@ -534,6 +534,10 @@ export default function SteelSentinelDashboard() {
       imageryProvider: false as any // Disable default Bing imagery completely
     });
 
+    // Adjust resolution for modern high-DPI / Retina displays (eliminates all pixelation)
+    viewer.resolutionScale = window.devicePixelRatio || 1.0;
+    viewer.useBrowserRecommendedResolution = false;
+
     viewerRef.current = viewer;
     setIsCesiumLoaded(true);
 
@@ -622,13 +626,15 @@ export default function SteelSentinelDashboard() {
         point: { pixelSize: 10, color: Cesium.Color.fromCssColorString(color), outlineColor: Cesium.Color.WHITE, outlineWidth: 2, disableDepthTestDistance: Number.POSITIVE_INFINITY },
         label: {
           text: node.name.toUpperCase(),
-          font: "bold 11px Share Tech Mono, monospace",
+          font: "bold 32px Share Tech Mono, monospace",
           fillColor: Cesium.Color.fromCssColorString(color),
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineWidth: 4,
-          outlineColor: Cesium.Color.WHITE,
+          style: Cesium.LabelStyle.FILL,
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString("#020617").withAlpha(0.85),
+          backgroundPadding: new Cesium.Cartesian2(20, 10),
+          scale: 0.35,
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          pixelOffset: new Cesium.Cartesian2(0, -14),
+          pixelOffset: new Cesium.Cartesian2(0, -18),
           disableDepthTestDistance: Number.POSITIVE_INFINITY
         }
       });
@@ -639,13 +645,15 @@ export default function SteelSentinelDashboard() {
         position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
         label: {
           text: `[${node.id}] ${node.lat.toFixed(4)}°N ${node.lon.toFixed(4)}°E`,
-          font: "9px JetBrains Mono, monospace",
-          fillColor: Cesium.Color.fromCssColorString("#64748b"),
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineWidth: 3,
-          outlineColor: Cesium.Color.WHITE,
+          font: "bold 24px JetBrains Mono, monospace",
+          fillColor: Cesium.Color.fromCssColorString("#94a3b8"),
+          style: Cesium.LabelStyle.FILL,
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString("#1e293b").withAlpha(0.75),
+          backgroundPadding: new Cesium.Cartesian2(16, 8),
+          scale: 0.35,
           verticalOrigin: Cesium.VerticalOrigin.TOP,
-          pixelOffset: new Cesium.Cartesian2(0, 6),
+          pixelOffset: new Cesium.Cartesian2(0, 10),
           disableDepthTestDistance: Number.POSITIVE_INFINITY
         }
       });
@@ -845,13 +853,15 @@ export default function SteelSentinelDashboard() {
           position: Cesium.Cartesian3.fromDegrees(lon, lat, 70),
           label: {
             text: newSys.name,
-            font: "bold 10px Share Tech Mono, monospace",
+            font: "bold 30px Share Tech Mono, monospace",
             fillColor: Cesium.Color.fromCssColorString(newSys.color),
-            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-            outlineWidth: 3,
-            outlineColor: Cesium.Color.WHITE,
+            style: Cesium.LabelStyle.FILL,
+            showBackground: true,
+            backgroundColor: Cesium.Color.fromCssColorString("#020617").withAlpha(0.85),
+            backgroundPadding: new Cesium.Cartesian2(20, 10),
+            scale: 0.35,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-            pixelOffset: new Cesium.Cartesian2(0, -8),
+            pixelOffset: new Cesium.Cartesian2(0, -12),
             disableDepthTestDistance: Number.POSITIVE_INFINITY
           }
         });
