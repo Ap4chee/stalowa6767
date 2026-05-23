@@ -48,6 +48,21 @@ export default function SteelSentinelDashboard() {
   const [loggerCollapsed, setLoggerCollapsed] = useState(false);
   const [schemaModeEnabled, setSchemaModeEnabled] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [mapLayers, setMapLayers] = useState({
+    baseMap: true,
+    nodes: true,
+    domes: true,
+    threats: true,
+    tacticalZones: true,
+    hydrology: true
+  });
+
+  const handleToggleLayer = useCallback((key: keyof typeof mapLayers) => {
+    setMapLayers((prev) => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  }, []);
 
   // Sync theme on mount
   useEffect(() => {
@@ -131,7 +146,8 @@ export default function SteelSentinelDashboard() {
     setHoveredCoords,
     setSelectedNode,
     setSelectedSystem,
-    theme
+    theme,
+    mapLayers
   });
 
   useEffect(() => {
@@ -363,7 +379,12 @@ export default function SteelSentinelDashboard() {
         </div>
       )}
 
-      <CesiumViewport cesiumContainerRef={cesiumContainerRef} isSplitScreen={schemaModeEnabled} />
+      <CesiumViewport 
+        cesiumContainerRef={cesiumContainerRef} 
+        isSplitScreen={schemaModeEnabled}
+        mapLayers={mapLayers}
+        onToggleLayer={handleToggleLayer}
+      />
 
       {/* Unified Left Sidebar Column */}
       {!schemaModeEnabled && (

@@ -5,6 +5,15 @@ import { THREAT_TYPES } from "../data/threats";
 import { INITIAL_NODES, NODE_COLORS } from "../data/nodes";
 import { SAN_RIVER_COORDS } from "../data/river";
 
+interface MapLayersState {
+  baseMap: boolean;
+  nodes: boolean;
+  domes: boolean;
+  threats: boolean;
+  tacticalZones: boolean;
+  hydrology: boolean;
+}
+
 interface UseCesiumViewerOptions {
   containerRef: MutableRefObject<HTMLDivElement | null>;
   simStateRef: MutableRefObject<SimState>;
@@ -19,6 +28,7 @@ interface UseCesiumViewerOptions {
   setSelectedNode?: (node: CriticalNode | null) => void;
   setSelectedSystem?: (sys: DeployedSystem | null) => void;
   theme?: "light" | "dark";
+  mapLayers: MapLayersState;
 }
 
 export function useCesiumViewer({
@@ -34,14 +44,20 @@ export function useCesiumViewer({
   setHoveredCoords,
   setSelectedNode,
   setSelectedSystem,
-  theme = "light"
+  theme = "light",
+  mapLayers
 }: UseCesiumViewerOptions) {
   const viewerRef = useRef<any>(null);
   const nodeEntitiesRef = useRef<{ [id: string]: any }>({});
-  const domeEntitiesRef = useRef<{ [id: string]: any }>({});
+  const domeEntitiesRef = useRef<{ [id: string]: any[] }>({});
   const threatEntitiesRef = useRef<{ [id: string]: any }>({});
   const laserLinesRef = useRef<any>(null);
   const [isCesiumLoaded, setIsCesiumLoaded] = useState(false);
+
+  // Layer groups refs to easily toggle visibility
+  const nodeEntitiesGroupRef = useRef<any[]>([]);
+  const hydrologyEntitiesGroupRef = useRef<any[]>([]);
+  const tacticalZoneEntitiesGroupRef = useRef<any[]>([]);
 
   const flyToNode = useCallback((lat: number, lon: number, name: string) => {
     const viewer = viewerRef.current;
@@ -64,7 +80,12 @@ export function useCesiumViewer({
     if (!viewer) return;
 
     Object.keys(domeEntitiesRef.current).forEach((key) => {
-      viewer.entities.remove(domeEntitiesRef.current[key]);
+      const ents = domeEntitiesRef.current[key];
+      if (Array.isArray(ents)) {
+        ents.forEach(ent => viewer.entities.remove(ent));
+      } else {
+        viewer.entities.remove(ents);
+      }
     });
     domeEntitiesRef.current = {};
 
@@ -98,6 +119,12 @@ export function useCesiumViewer({
     });
 
     if (domeEntitiesRef.current[sysId]) {
+      const ents = domeEntitiesRef.current[sysId];
+      if (Array.isArray(ents)) {
+        ents.forEach(ent => viewer.entities.remove(ent));
+      } else {
+        viewer.entities.remove(ents);
+      }
       delete domeEntitiesRef.current[sysId];
     }
   }, []);
@@ -147,12 +174,17 @@ export function useCesiumViewer({
       }
     });
 
+    // Reset list refs
+    nodeEntitiesGroupRef.current = [];
+    hydrologyEntitiesGroupRef.current = [];
+    tacticalZoneEntitiesGroupRef.current = [];
+
     INITIAL_NODES.forEach((node) => {
       const color = NODE_COLORS[node.type] || "#16a34a";
       const glassColor = Cesium.Color.fromCssColorString(color).withAlpha(0.25);
 
-      // 1. Sleek Single-Primitive Glassmorphic Hexagonal Tower (No heavy outlines!)
-      viewer.entities.add({
+      // 1. Hexagonal Tower Cylinder
+      const towerCylinder = viewer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 25),
         cylinder: {
           length: 50,
@@ -161,11 +193,13 @@ export function useCesiumViewer({
           slices: 6,
           material: glassColor,
           outline: false
-        }
+        },
+        show: mapLayers.nodes
       });
+      nodeEntitiesGroupRef.current.push(towerCylinder);
 
-      // 2. Tactical Vertical Beacon Line (Extremely lightweight, links ground to floating label)
-      viewer.entities.add({
+      // 2. Vertical Beacon Line
+      const beaconLine = viewer.entities.add({
         polyline: {
           positions: Cesium.Cartesian3.fromDegreesArrayHeights([
             node.lon, node.lat, 0,
@@ -173,11 +207,13 @@ export function useCesiumViewer({
           ]),
           width: 1.5,
           material: Cesium.Color.fromCssColorString(color).withAlpha(0.75)
-        }
+        },
+        show: mapLayers.nodes
       });
+      nodeEntitiesGroupRef.current.push(beaconLine);
 
-      // 3. Ground-Level Tactical Highlight Ring
-      viewer.entities.add({
+      // 3. Ground ellipse Ring
+      const ellipseRing = viewer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat),
         ellipse: {
           semiMajorAxis: 90,
@@ -185,10 +221,12 @@ export function useCesiumViewer({
           material: Cesium.Color.fromCssColorString(color).withAlpha(0.1),
           outline: false,
           height: 0
-        }
+        },
+        show: mapLayers.nodes
       });
+      nodeEntitiesGroupRef.current.push(ellipseRing);
 
-      // 4. Primary Label (High resolution, supersampled dark text with crisp white halo!)
+      // 4. Primary Label Point & Text
       const nodeEntity = viewer.entities.add({
         id: node.id,
         position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
@@ -211,12 +249,14 @@ export function useCesiumViewer({
           verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
           pixelOffset: new Cesium.Cartesian2(0, -18),
           disableDepthTestDistance: Number.POSITIVE_INFINITY
-        }
+        },
+        show: mapLayers.nodes
       });
       nodeEntitiesRef.current[node.id] = nodeEntity;
+      nodeEntitiesGroupRef.current.push(nodeEntity);
 
-      // 5. Secondary Coordinate Label (High-contrast, crisp!)
-      viewer.entities.add({
+      // 5. Coordinates Label
+      const coordLabel = viewer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
         label: {
           text: `[${node.id}] ${node.lat.toFixed(4)}°N ${node.lon.toFixed(4)}°E`,
@@ -230,12 +270,16 @@ export function useCesiumViewer({
           verticalOrigin: Cesium.VerticalOrigin.TOP,
           pixelOffset: new Cesium.Cartesian2(0, 10),
           disableDepthTestDistance: Number.POSITIVE_INFINITY
-        }
+        },
+        show: mapLayers.nodes
       });
+      nodeEntitiesGroupRef.current.push(coordLabel);
     });
 
     const riverCoordsArray = SAN_RIVER_COORDS.flatMap(c => [c.lon, c.lat]);
-    viewer.entities.add({
+    
+    // River Glow line
+    const riverGlow = viewer.entities.add({
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArray(riverCoordsArray),
         width: 8,
@@ -244,17 +288,25 @@ export function useCesiumViewer({
           color: Cesium.Color.fromCssColorString("#0891b2").withAlpha(0.6)
         }),
         clampToGround: true
-      }
+      },
+      show: mapLayers.hydrology
     });
-    viewer.entities.add({
+    hydrologyEntitiesGroupRef.current.push(riverGlow);
+
+    // River Core line
+    const riverCore = viewer.entities.add({
       polyline: {
         positions: Cesium.Cartesian3.fromDegreesArray(riverCoordsArray),
         width: 2.5,
         material: Cesium.Color.CYAN,
         clampToGround: true
-      }
+      },
+      show: mapLayers.hydrology
     });
-    viewer.entities.add({
+    hydrologyEntitiesGroupRef.current.push(riverCore);
+
+    // River Label text
+    const riverLabel = viewer.entities.add({
       position: Cesium.Cartesian3.fromDegrees(22.0620, 50.5700, 50),
       label: {
         text: "RZEKA SAN",
@@ -265,10 +317,13 @@ export function useCesiumViewer({
         outlineWidth: 5,
         scale: 0.35,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+      },
+      show: mapLayers.hydrology
     });
+    hydrologyEntitiesGroupRef.current.push(riverLabel);
 
-    viewer.entities.add({
+    // Tactical Zone bounding rectangle
+    const zoneRect = viewer.entities.add({
       rectangle: {
         coordinates: Cesium.Rectangle.fromDegrees(22.01, 50.52, 22.09, 50.60),
         material: Cesium.Color.CYAN.withAlpha(0.02),
@@ -276,9 +331,13 @@ export function useCesiumViewer({
         outlineColor: Cesium.Color.CYAN.withAlpha(0.25),
         outlineWidth: 1.5,
         height: 0
-      }
+      },
+      show: mapLayers.tacticalZones
     });
-    viewer.entities.add({
+    tacticalZoneEntitiesGroupRef.current.push(zoneRect);
+
+    // NW label
+    const zoneLabelNW = viewer.entities.add({
       position: Cesium.Cartesian3.fromDegrees(22.01, 50.60, 30),
       label: {
         text: "ZONA TAKTYCZNA STW // NW",
@@ -289,9 +348,13 @@ export function useCesiumViewer({
         outlineWidth: 4,
         scale: 0.3,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+      },
+      show: mapLayers.tacticalZones
     });
-    viewer.entities.add({
+    tacticalZoneEntitiesGroupRef.current.push(zoneLabelNW);
+
+    // SE label
+    const zoneLabelSE = viewer.entities.add({
       position: Cesium.Cartesian3.fromDegrees(22.09, 50.52, 30),
       label: {
         text: "ZONA TAKTYCZNA STW // SE",
@@ -302,8 +365,10 @@ export function useCesiumViewer({
         outlineWidth: 4,
         scale: 0.3,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
-      }
+      },
+      show: mapLayers.tacticalZones
     });
+    tacticalZoneEntitiesGroupRef.current.push(zoneLabelSE);
 
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     let lastUpdate = 0;
@@ -401,10 +466,11 @@ export function useCesiumViewer({
             outline: false,
             minimumCone: 0,
             maximumCone: Cesium.Math.PI_OVER_TWO
-          }
+          },
+          show: mapLayers.domes
         });
 
-        viewer.entities.add({
+        const groundCircle = viewer.entities.add({
           position: Cesium.Cartesian3.fromDegrees(lon, lat),
           ellipse: {
             semiMajorAxis: newSys.radius,
@@ -414,12 +480,13 @@ export function useCesiumViewer({
             outlineColor: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.5),
             outlineWidth: 2,
             height: 0
-          }
+          },
+          show: mapLayers.domes
         });
 
         const deployedGlassColor = Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.25);
 
-        // 1. Sleek Single-Primitive glass launch tower (No outline!)
+        // 1. Sleek launch tower
         viewer.entities.add({
           id: newSys.id + "_tower",
           position: Cesium.Cartesian3.fromDegrees(lon, lat, 20),
@@ -444,7 +511,7 @@ export function useCesiumViewer({
           }
         });
 
-        // 3. Primary High-Contrast Supersampled Label
+        // 3. Primary Label
         viewer.entities.add({
           id: newSys.id + "_label",
           position: Cesium.Cartesian3.fromDegrees(lon, lat, 70),
@@ -462,7 +529,8 @@ export function useCesiumViewer({
             disableDepthTestDistance: Number.POSITIVE_INFINITY
           }
         });
-        domeEntitiesRef.current[newSys.id] = domeEntity;
+        
+        domeEntitiesRef.current[newSys.id] = [domeEntity, groundCircle];
 
         setDeployedSystems((prev) => [...prev, newSys]);
         setSelectedWeapon(null);
@@ -545,6 +613,8 @@ export function useCesiumViewer({
         }
 
         threatEntity.position = Cesium.Cartesian3.fromDegrees(threat.lon, threat.lat, threat.alt);
+        // Sync show property dynamically
+        threatEntity.show = mapLayers.threats;
 
         let interceptedThisFrame = false;
         const threatPos = Cesium.Cartesian3.fromDegrees(threat.lon, threat.lat, threat.alt);
@@ -629,6 +699,49 @@ export function useCesiumViewer({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Toggle visibility of Critical Nodes
+  useEffect(() => {
+    nodeEntitiesGroupRef.current.forEach(entity => {
+      if (entity) entity.show = mapLayers.nodes;
+    });
+  }, [mapLayers.nodes, isCesiumLoaded]);
+
+  // Toggle visibility of Hydrology (River San)
+  useEffect(() => {
+    hydrologyEntitiesGroupRef.current.forEach(entity => {
+      if (entity) entity.show = mapLayers.hydrology;
+    });
+  }, [mapLayers.hydrology, isCesiumLoaded]);
+
+  // Toggle visibility of Tactical Zones
+  useEffect(() => {
+    tacticalZoneEntitiesGroupRef.current.forEach(entity => {
+      if (entity) entity.show = mapLayers.tacticalZones;
+    });
+  }, [mapLayers.tacticalZones, isCesiumLoaded]);
+
+  // Toggle visibility of Defense Domes
+  useEffect(() => {
+    Object.keys(domeEntitiesRef.current).forEach(id => {
+      const entities = domeEntitiesRef.current[id];
+      if (Array.isArray(entities)) {
+        entities.forEach(ent => {
+          if (ent) ent.show = mapLayers.domes;
+        });
+      } else if (entities) {
+        (entities as any).show = mapLayers.domes;
+      }
+    });
+  }, [mapLayers.domes, isCesiumLoaded]);
+
+  // Toggle base map imagery
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (viewer && isCesiumLoaded) {
+      viewer.imageryLayers.show = mapLayers.baseMap;
+    }
+  }, [mapLayers.baseMap, isCesiumLoaded]);
 
   // Dynamic Imagery & Theme Swapper for the 3D GIS terrain
   useEffect(() => {
