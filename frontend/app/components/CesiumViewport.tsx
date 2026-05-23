@@ -36,30 +36,12 @@ export function CesiumViewport({
       
       {/* Interactive Tactical GIS Layer Controller */}
       <div 
-        style={{ top: "80px", left: "352px", position: "absolute" }}
-        className="z-30 font-mono flex flex-col gap-2 border theme-border theme-bg-panel p-3 rounded-lg theme-text-secondary shadow-xl w-64 pointer-events-auto"
+        style={{ bottom: "16px", left: "calc(50% + 285px)", position: "fixed" }}
+        className="z-50 font-mono flex flex-col gap-2 border theme-border theme-bg-panel p-3 rounded-lg theme-text-secondary shadow-xl w-64 pointer-events-auto"
       >
-        {/* Header */}
-        <div className="flex justify-between items-center border-b theme-border pb-2">
-          <div className="flex flex-col">
-            <div className="text-[9px] theme-text-muted flex items-center gap-1.5">
-              <Activity className="w-3 h-3 theme-neon-text animate-pulse" />
-              <span>STW_GRID: GIS LINK</span>
-            </div>
-            <div className="font-bold text-[10px] theme-text-primary tracking-wide">WARSTWY TAKTYCZNE</div>
-          </div>
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="p-1 hover:theme-bg-panel-hover theme-text-muted hover:theme-text-primary rounded border theme-border transition-all cursor-pointer"
-            title="Zarządzaj warstwami"
-          >
-            <Layers className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
         {/* Collapsible Layer Selector */}
         <div className={`flex flex-col gap-1.5 overflow-hidden transition-all duration-300 ${
-          isOpen ? "max-h-64 opacity-100 mt-1" : "max-h-0 opacity-0 pointer-events-none"
+          isOpen ? "max-h-64 opacity-100 mb-2" : "max-h-0 opacity-0 pointer-events-none"
         }`}>
           {/* Base Map Toggle */}
           <button
@@ -167,6 +149,24 @@ export function CesiumViewport({
                 mapLayers.hydrology ? "right-0.5 bg-cyan-500" : "left-0.5 theme-bg-muted"
               }`} />
             </div>
+          </button>
+        </div>
+
+        {/* Header */}
+        <div className={`flex justify-between items-center ${isOpen ? "border-t theme-border pt-2" : ""}`}>
+          <div className="flex flex-col">
+            <div className="text-[9px] theme-text-muted flex items-center gap-1.5">
+              <Activity className="w-3 h-3 theme-neon-text animate-pulse" />
+              <span>STW_GRID: GIS LINK</span>
+            </div>
+            <div className="font-bold text-[10px] theme-text-primary tracking-wide">WARSTWY TAKTYCZNE</div>
+          </div>
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-1 hover:theme-bg-panel-hover theme-text-muted hover:theme-text-primary rounded border theme-border transition-all cursor-pointer"
+            title="Zarządzaj warstwami"
+          >
+            <Layers className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
