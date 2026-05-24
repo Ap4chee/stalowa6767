@@ -36,7 +36,6 @@ export default function SteelSentinelDashboard() {
   const [simSpeed, setSimSpeed] = useState<number>(1);
   const [playbookActive, setPlaybookActive] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<SidebarTab>("details");
   const [clockTime, setClockTime] = useState<string>("");
   const [hoveredCoords, setHoveredCoords] = useState<HoveredCoords>({
     lat: CENTER_LAT, lon: CENTER_LON, alt: 145, az: 0
@@ -461,18 +460,11 @@ export default function SteelSentinelDashboard() {
         <div className="fixed left-4 top-20 bottom-4 w-80 z-40 flex flex-col gap-3 pointer-events-none">
           <div className="pointer-events-auto flex flex-col gap-3 h-full min-h-0">
             <LeftSidebar
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
               nodes={nodes}
               relations={relations}
-              coolingSecondsLeft={coolingSecondsLeft}
-              waterSecondsLeft={waterSecondsLeft}
               onNodeClick={handleNodeClick}
               onAddNode={handleAddNode}
               onAddRelation={handleAddRelation}
-              playbookActive={playbookActive}
-              onActivatePlaybook={activatePlaybook}
-              onStopPlaybook={() => setPlaybookActive(null)}
               isCollapsed={leftPanelCollapsed}
               onToggle={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
             />
