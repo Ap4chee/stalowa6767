@@ -171,7 +171,7 @@ export function TelemetryHUD({
           {/* Base Map Style Selector */}
           <div className="border-t theme-border pt-2.5 mt-1 space-y-1.5">
             <span className="text-[8px] theme-text-muted font-bold font-rajdhani tracking-wider block">STYL PODKŁADU MAPY</span>
-            <div className="grid grid-cols-3 gap-1 bg-slate-950/60 p-0.5 rounded border theme-border">
+            <div className="grid grid-cols-3 gap-1 theme-bg-app p-0.5 rounded border theme-border">
               <button
                 onClick={() => onSetBaseMapType("standard")}
                 className={`py-1 text-[8px] font-bold tracking-wider rounded transition-all cursor-pointer text-center ${

@@ -441,7 +441,7 @@ export function DependencyFlow({
                     placeholder="np. ELEKTROWNIA STALOWA WOLA"
                     value={nodeName}
                     onChange={(e) => setNodeName(e.target.value)}
-                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] placeholder:opacity-40"
+                    className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] placeholder:opacity-40"
                   />
                 </div>
 
@@ -451,20 +451,20 @@ export function DependencyFlow({
                     <select
                       value={nodeType}
                       onChange={(e) => setNodeType(e.target.value as any)}
-                      className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                      className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
                     >
-                      <option value="industrial">Huta / Przemysł</option>
-                      <option value="power">Elektrownia / Agregat</option>
-                      <option value="water">Ujęcie Wody / Pompownia</option>
-                      <option value="electrical">Rozdzielnia GPZ</option>
-                      <option value="logistic">Węzeł Gazowy / Paliwowy</option>
-                      <option value="transit">Dworzec / Tranzyt</option>
-                      <option value="hq">Sztab Kryzysowy / Dowodzenie</option>
+                      <option value="industrial" className="theme-input">Huta / Przemysł</option>
+                      <option value="power" className="theme-input">Elektrownia / Agregat</option>
+                      <option value="water" className="theme-input">Ujęcie Wody / Pompownia</option>
+                      <option value="electrical" className="theme-input">Rozdzielnia GPZ</option>
+                      <option value="logistic" className="theme-input">Węzeł Gazowy / Paliwowy</option>
+                      <option value="transit" className="theme-input">Dworzec / Tranzyt</option>
+                      <option value="hq" className="theme-input">Sztab Kryzysowy / Dowodzenie</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-[8px] theme-text-muted mb-1">LOKALIZACJA GPS LUB SEKTOR:</label>
-                    <div className="text-[8px] text-cyan-400 font-semibold py-1.5 px-1 bg-slate-950/50 border theme-border rounded text-center">
+                    <div className="text-[8px] text-cyan-400 font-semibold py-1.5 px-1 theme-bg-app border theme-border rounded text-center">
                       DOMYŚLNE WSPÓŁRZĘDNE
                     </div>
                   </div>
@@ -478,7 +478,7 @@ export function DependencyFlow({
                       required
                       value={nodeLat}
                       onChange={(e) => setNodeLat(e.target.value)}
-                      className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                      className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
                     />
                   </div>
                   <div>
@@ -488,7 +488,7 @@ export function DependencyFlow({
                       required
                       value={nodeLon}
                       onChange={(e) => setNodeLon(e.target.value)}
-                      className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                      className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
                     />
                   </div>
                 </div>
@@ -500,7 +500,7 @@ export function DependencyFlow({
                     value={nodeDesc}
                     onChange={(e) => setNodeDesc(e.target.value)}
                     rows={2}
-                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] resize-none placeholder:opacity-40"
+                    className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] resize-none placeholder:opacity-40"
                   />
                 </div>
 
@@ -511,7 +511,7 @@ export function DependencyFlow({
                     value={nodeNotes}
                     onChange={(e) => setNodeNotes(e.target.value)}
                     rows={2}
-                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] resize-none placeholder:opacity-40"
+                    className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] resize-none placeholder:opacity-40"
                   />
                 </div>
 
@@ -530,11 +530,11 @@ export function DependencyFlow({
                   <select
                     value={relSource}
                     onChange={(e) => setRelSource(e.target.value)}
-                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                    className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
                   >
-                    <option value="">Wybierz węzeł dawcę...</option>
+                    <option value="" className="theme-input">Wybierz węzeł dawcę...</option>
                     {nodes.map((n) => (
-                      <option key={n.id} value={n.id}>
+                      <option key={n.id} value={n.id} className="theme-input">
                         {n.name} ({n.id})
                       </option>
                     ))}
@@ -546,11 +546,11 @@ export function DependencyFlow({
                   <select
                     value={relTarget}
                     onChange={(e) => setRelTarget(e.target.value)}
-                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                    className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
                   >
-                    <option value="">Wybierz węzeł biorcę...</option>
+                    <option value="" className="theme-input">Wybierz węzeł biorcę...</option>
                     {nodes.map((n) => (
-                      <option key={n.id} value={n.id}>
+                      <option key={n.id} value={n.id} className="theme-input">
                         {n.name} ({n.id})
                       </option>
                     ))}
@@ -562,15 +562,15 @@ export function DependencyFlow({
                   <select
                     value={relLabel}
                     onChange={(e) => setRelLabel(e.target.value)}
-                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                    className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
                   >
-                    <option value="ZASILANIE">ZASILANIE (ELEKTRYCZNE)</option>
-                    <option value="PALIWO">PALIWO (GAZ / MAZUT)</option>
-                    <option value="CHŁODZIWO">CHŁODZIWO (WODA HYDROGRAFICZNA)</option>
-                    <option value="TELCO">TELCO (ŁĄCZNOŚĆ ŚWIATŁOWODOWA)</option>
-                    <option value="DOWODZENIE">DOWODZENIE (STRATEGICZNE / C2)</option>
-                    <option value="LOGISTYKA">LOGISTYKA (ZAOPATRZENIE SPALNE)</option>
-                    <option value="CUSTOM">INNY / ZDEFINIUJ RĘCZNIE...</option>
+                    <option value="ZASILANIE" className="theme-input">ZASILANIE (ELEKTRYCZNE)</option>
+                    <option value="PALIWO" className="theme-input">PALIWO (GAZ / MAZUT)</option>
+                    <option value="CHŁODZIWO" className="theme-input">CHŁODZIWO (WODA HYDROGRAFICZNA)</option>
+                    <option value="TELCO" className="theme-input">TELCO (ŁĄCZNOŚĆ ŚWIATŁOWODOWA)</option>
+                    <option value="DOWODZENIE" className="theme-input">DOWODZENIE (STRATEGICZNE / C2)</option>
+                    <option value="LOGISTYKA" className="theme-input">LOGISTYKA (ZAOPATRZENIE SPALNE)</option>
+                    <option value="CUSTOM" className="theme-input">INNY / ZDEFINIUJ RĘCZNIE...</option>
                   </select>
                 </div>
 
@@ -583,7 +583,7 @@ export function DependencyFlow({
                       placeholder="np. TRANSFER MATERIAŁÓW"
                       value={customLabel}
                       onChange={(e) => setCustomLabel(e.target.value)}
-                      className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] uppercase"
+                      className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] uppercase"
                     />
                   </div>
                 )}
@@ -653,7 +653,7 @@ export function DependencyFlow({
           <div className="w-80 theme-bg-panel border border-cyan-500/50 p-4 rounded shadow-2xl font-mono text-[10px] theme-text-primary clip-chamfer">
             <div className="flex justify-between items-center pb-2 border-b theme-border mb-3">
               <span className="font-rajdhani font-extrabold tracking-wider text-[11px] theme-neon-text">KLASYFIKACJA POWIĄZANIA</span>
-              <button onClick={() => setPendingConnection(null)} className="text-slate-400 hover:text-white cursor-pointer">
+              <button onClick={() => setPendingConnection(null)} className="text-slate-400 hover:theme-text-primary cursor-pointer">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -669,15 +669,15 @@ export function DependencyFlow({
                 <select
                   value={pendingLabel}
                   onChange={(e) => setPendingLabel(e.target.value)}
-                  className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                  className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
                 >
-                  <option value="ZASILANIE">ZASILANIE (ELEKTRYCZNE)</option>
-                  <option value="PALIWO">PALIWO (GAZ / MAZUT)</option>
-                  <option value="CHŁODZIWO">CHŁODZIWO (WODA HYDROGRAFICZNA)</option>
-                  <option value="TELCO">TELCO (ŁĄCZNOŚĆ ŚWIATŁOWODOWA)</option>
-                  <option value="DOWODZENIE">DOWODZENIE (STRATEGICZNE / C2)</option>
-                  <option value="LOGISTYKA">LOGISTYKA (ZAOPATRZENIE SPALNE)</option>
-                  <option value="CUSTOM">INNY / ZDEFINIUJ RĘCZNIE...</option>
+                  <option value="ZASILANIE" className="theme-input">ZASILANIE (ELEKTRYCZNE)</option>
+                  <option value="PALIWO" className="theme-input">PALIWO (GAZ / MAZUT)</option>
+                  <option value="CHŁODZIWO" className="theme-input">CHŁODZIWO (WODA HYDROGRAFICZNA)</option>
+                  <option value="TELCO" className="theme-input">TELCO (ŁĄCZNOŚĆ ŚWIATŁOWODOWA)</option>
+                  <option value="DOWODZENIE" className="theme-input">DOWODZENIE (STRATEGICZNE / C2)</option>
+                  <option value="LOGISTYKA" className="theme-input">LOGISTYKA (ZAOPATRZENIE SPALNE)</option>
+                  <option value="CUSTOM" className="theme-input">INNY / ZDEFINIUJ RĘCZNIE...</option>
                 </select>
               </div>
 
@@ -690,7 +690,7 @@ export function DependencyFlow({
                     placeholder="np. SENSORY / WIDEO"
                     value={customPendingLabel}
                     onChange={(e) => setCustomPendingLabel(e.target.value)}
-                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] uppercase"
+                    className="w-full theme-input border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] uppercase"
                   />
                 </div>
               )}
@@ -699,7 +699,7 @@ export function DependencyFlow({
                 <button
                   type="button"
                   onClick={() => setPendingConnection(null)}
-                  className="w-full py-1.5 theme-bg-app border theme-border hover:theme-neon-border text-slate-400 hover:text-white font-bold text-[9px] tracking-wider clip-chamfer transition-all cursor-pointer"
+                  className="w-full py-1.5 theme-bg-app border theme-border hover:theme-neon-border text-slate-400 hover:theme-text-primary font-bold text-[9px] tracking-wider clip-chamfer transition-all cursor-pointer"
                 >
                   ANULUJ
                 </button>

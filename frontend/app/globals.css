@@ -102,6 +102,17 @@ body {
   background-color: var(--bg-button-hover);
 }
 
+.theme-input {
+  background-color: var(--bg-app) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-panel) !important;
+  transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease;
+}
+.theme-input::placeholder {
+  color: var(--text-muted) !important;
+  opacity: 0.5;
+}
+
 
 
 
