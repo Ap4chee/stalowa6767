@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { CriticalNode, DeployedSystem, Threat, LogEntry, HoveredCoords, SidebarTab, WeaponType, SimState } from "./types";
-import { INITIAL_NODES, CENTER_LAT, CENTER_LON } from "./data/nodes";
+import { CriticalNode, DeployedSystem, Threat, LogEntry, HoveredCoords, SidebarTab, WeaponType, SimState, NodeRelation } from "./types";
+import { INITIAL_NODES, INITIAL_RELATIONS, CENTER_LAT, CENTER_LON } from "./data/nodes";
 import { WEAPONS } from "./data/weapons";
 import { THREAT_TYPES } from "./data/threats";
 import { useAudio } from "./hooks/useAudio";
@@ -23,6 +23,7 @@ import { ThreatModelViewer } from "./components/ThreatModelViewer";
 
 export default function SteelSentinelDashboard() {
   const [nodes, setNodes] = useState<CriticalNode[]>(INITIAL_NODES);
+  const [relations, setRelations] = useState<NodeRelation[]>(INITIAL_RELATIONS);
   const [deployedSystems, setDeployedSystems] = useState<DeployedSystem[]>([]);
   const [selectedWeapon, setSelectedWeapon] = useState<WeaponType | null>(null);
   const [threats, setThreats] = useState<Threat[]>([]);
@@ -53,6 +54,7 @@ export default function SteelSentinelDashboard() {
   const [mapLayers, setMapLayers] = useState({
     baseMap: true,
     nodes: true,
+    relations: true,
     domes: true,
     threats: true,
     tacticalZones: true,
@@ -149,7 +151,9 @@ export default function SteelSentinelDashboard() {
     setSelectedNode,
     setSelectedSystem,
     theme,
-    mapLayers
+    mapLayers,
+    nodes,
+    relations
   });
 
   useEffect(() => {
@@ -255,6 +259,16 @@ export default function SteelSentinelDashboard() {
     setSelectedSystem(null);
     flyToNode(node.lat, node.lon, node.name);
   }, [flyToNode]);
+
+  const handleAddNode = useCallback((newNode: CriticalNode) => {
+    setNodes((prev) => [...prev, newNode]);
+    addLog(`DODANO NOWY WĘZEŁ STRATEGICZNY: ${newNode.name.toUpperCase()} [ID: ${newNode.id}]`, "success");
+  }, [addLog]);
+
+  const handleAddRelation = useCallback((newRel: NodeRelation) => {
+    setRelations((prev) => [...prev, newRel]);
+    addLog(`POWIĄZANIE SYSTEMOWE: Utworzono relację przepływu ${newRel.source} -> ${newRel.target} [${newRel.label}]`, "success");
+  }, [addLog]);
 
   const handleActivateBackupPower = useCallback((nodeId: string) => {
     addLog(`SIECI ROZDZIELCZE: Ręczne załączenie agregatu rezerwowego dla węzła ${nodeId}.`, "success");
@@ -367,6 +381,7 @@ export default function SteelSentinelDashboard() {
         <div className="fixed top-[72px] bottom-0 left-0 right-0 z-20 theme-bg-app flex flex-col transition-all duration-500 ease-in-out">
           <DependencyFlow
             nodes={nodes}
+            relations={relations}
             theme={theme}
             onFlyTo={(lat, lon, name) => {
               // Automatically switch back to 3D map view
@@ -398,9 +413,12 @@ export default function SteelSentinelDashboard() {
               activeTab={activeTab}
               onTabChange={setActiveTab}
               nodes={nodes}
+              relations={relations}
               coolingSecondsLeft={coolingSecondsLeft}
               waterSecondsLeft={waterSecondsLeft}
               onNodeClick={handleNodeClick}
+              onAddNode={handleAddNode}
+              onAddRelation={handleAddRelation}
               playbookActive={playbookActive}
               onActivatePlaybook={activatePlaybook}
               onStopPlaybook={() => setPlaybookActive(null)}

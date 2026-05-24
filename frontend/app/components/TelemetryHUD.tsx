@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { HoveredCoords } from "../types";
-import { Layers, Map, Target, Shield, Activity, Grid, Waves } from "lucide-react";
+import { Layers, Map, Target, Shield, Activity, Grid, Waves, Network } from "lucide-react";
 
 interface TelemetryHUDProps {
   hoveredCoords: HoveredCoords;
   mapLayers: {
     baseMap: boolean;
     nodes: boolean;
+    relations: boolean;
     domes: boolean;
     threats: boolean;
     tacticalZones: boolean;
@@ -66,6 +67,24 @@ export function TelemetryHUD({ hoveredCoords, mapLayers, onToggleLayer }: Teleme
             }`}>
               <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full transition-all duration-250 ${
                 mapLayers.nodes ? "right-0.5 bg-cyan-500" : "left-0.5 theme-bg-muted"
+              }`} />
+            </div>
+          </button>
+
+          {/* Node Relations Toggle */}
+          <button
+            onClick={() => onToggleLayer("relations")}
+            className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded theme-bg-button hover:theme-bg-button-hover transition-all cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-2">
+              <Network className={`w-3.5 h-3.5 ${mapLayers.relations ? "theme-neon-text" : "theme-text-muted"}`} />
+              <span className={mapLayers.relations ? "theme-text-primary font-bold" : "theme-text-muted"}>Powiązania Węzłów</span>
+            </div>
+            <div className={`w-6 h-3 rounded-full border relative transition-all duration-250 ${
+              mapLayers.relations ? "bg-cyan-500/20 border-cyan-500" : "theme-bg-app theme-border"
+            }`}>
+              <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full transition-all duration-250 ${
+                mapLayers.relations ? "right-0.5 bg-cyan-500" : "left-0.5 theme-bg-muted"
               }`} />
             </div>
           </button>

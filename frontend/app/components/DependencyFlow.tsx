@@ -128,14 +128,17 @@ const nodeTypes = {
   criticalNode: CriticalNodeCard
 };
 
+import { NodeRelation } from "../types";
+
 interface DependencyFlowProps {
   nodes: CriticalNode[];
+  relations: NodeRelation[];
   onFlyTo?: (lat: number, lon: number, name: string) => void;
   theme?: "light" | "dark";
 }
 
-export function DependencyFlow({ nodes, onFlyTo, theme = "light" }: DependencyFlowProps) {
-  // Construct initial flow nodes state
+export function DependencyFlow({ nodes, relations, onFlyTo, theme = "light" }: DependencyFlowProps) {
+  // Construct initial flow nodes state (only runs once on mount)
   const initialNodes = React.useMemo<Node[]>(() => {
     return nodes.map((node) => ({
       id: node.id,
@@ -143,41 +146,46 @@ export function DependencyFlow({ nodes, onFlyTo, theme = "light" }: DependencyFl
       position: INITIAL_NODE_POSITIONS[node.id] || { x: 100, y: 100 },
       data: { node, onFlyTo }
     }));
-  }, [onFlyTo]); // only run once initially
+  }, [onFlyTo]);
 
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState(initialNodes);
 
-  // Safely synchronize simulation nodes updates from parent state (health, notes, status)
+  // Synchronize parent state nodes dynamically (including appending newly registered nodes)
   useEffect(() => {
-    setFlowNodes((prevNodes) =>
-      prevNodes.map((flowNode) => {
-        const matchingNode = nodes.find((n) => n.id === flowNode.id);
-        if (matchingNode) {
+    setFlowNodes((prevNodes) => {
+      const updatedNodes = prevNodes.map((fn) => {
+        const matching = nodes.find((n) => n.id === fn.id);
+        if (matching) {
           return {
-            ...flowNode,
-            data: {
-              ...flowNode.data,
-              node: matchingNode
-            }
+            ...fn,
+            data: { ...fn.data, node: matching }
           };
         }
-        return flowNode;
-      })
-    );
-  }, [nodes, setFlowNodes]);
+        return fn;
+      });
+
+      const newNodes = nodes.filter((n) => !prevNodes.some((fn) => fn.id === n.id));
+      if (newNodes.length === 0) return updatedNodes;
+
+      const nextIndex = prevNodes.length;
+      const additionalNodes = newNodes.map((n, i) => {
+        const xPos = 250 + ((nextIndex + i) % 3) * 200;
+        const yPos = 400 + Math.floor((nextIndex + i) / 3) * 120;
+        return {
+          id: n.id,
+          type: "criticalNode",
+          position: INITIAL_NODE_POSITIONS[n.id] || { x: xPos, y: yPos },
+          data: { node: n, onFlyTo }
+        };
+      });
+
+      return [...updatedNodes, ...additionalNodes];
+    });
+  }, [nodes, onFlyTo, setFlowNodes]);
 
   // Construct active dynamic edges mapping the physical dependencies in Stalowa Wola
   const initialEdges = React.useMemo<Edge[]>(() => {
-    const defaultEdges: { source: string; target: string; label: string }[] = [
-      { source: "OBJ_03", target: "OBJ_02", label: "CHŁODZIWO" }, // Water Intake -> Power Plant
-      { source: "OBJ_05", target: "OBJ_02", label: "PALIWO" },    // Gas Node -> Power Plant
-      { source: "OBJ_02", target: "OBJ_03", label: "ZASILANIE" }, // Power Plant -> Water Intake pumps
-      { source: "OBJ_02", target: "OBJ_01", label: "ZASILANIE" }, // Power Plant -> HSW Factory
-      { source: "OBJ_04", target: "OBJ_07", label: "ZASILANIE" }, // GPZ Substation -> Crisis HQ
-      { source: "OBJ_06", target: "OBJ_07", label: "TELCO" }      // San Tower -> Crisis HQ
-    ];
-
-    return defaultEdges.map(({ source, target, label }, idx) => {
+    return relations.map(({ source, target, label }, idx) => {
       const sourceNode = nodes.find((n) => n.id === source);
       const isSourceOperational = sourceNode?.status === "OPERATIONAL";
       const isSourceDegraded = sourceNode?.status === "DEGRADED";
@@ -209,7 +217,7 @@ export function DependencyFlow({ nodes, onFlyTo, theme = "light" }: DependencyFl
         }
       };
     });
-  }, [nodes, theme]);
+  }, [relations, nodes, theme]);
 
   const [flowEdges, setFlowEdges, onEdgesChange] = useEdgesState(initialEdges);
 

@@ -82,3 +82,9 @@ export interface SimState {
   nodes: CriticalNode[];
   selectedWeapon: WeaponType | null;
 }
+
+export interface NodeRelation {
+  source: string;
+  target: string;
+  label: string;
+}

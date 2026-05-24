@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, MutableRefObject } from "react";
-import { CriticalNode, DeployedSystem, HoveredCoords, LogType, SimState, Threat } from "../types";
+import { CriticalNode, DeployedSystem, HoveredCoords, LogType, SimState, Threat, NodeRelation } from "../types";
 import { WEAPONS } from "../data/weapons";
 import { THREAT_TYPES } from "../data/threats";
 import { INITIAL_NODES, NODE_COLORS } from "../data/nodes";
@@ -8,6 +8,7 @@ import { SAN_RIVER_COORDS } from "../data/river";
 interface MapLayersState {
   baseMap: boolean;
   nodes: boolean;
+  relations: boolean;
   domes: boolean;
   threats: boolean;
   tacticalZones: boolean;
@@ -29,6 +30,8 @@ interface UseCesiumViewerOptions {
   setSelectedSystem?: (sys: DeployedSystem | null) => void;
   theme?: "light" | "dark";
   mapLayers: MapLayersState;
+  nodes: CriticalNode[];
+  relations: NodeRelation[];
 }
 
 export function useCesiumViewer({
@@ -45,7 +48,9 @@ export function useCesiumViewer({
   setSelectedNode,
   setSelectedSystem,
   theme = "light",
-  mapLayers
+  mapLayers,
+  nodes,
+  relations
 }: UseCesiumViewerOptions) {
   const viewerRef = useRef<any>(null);
   const nodeEntitiesRef = useRef<{ [id: string]: any }>({});
@@ -56,6 +61,7 @@ export function useCesiumViewer({
 
   // Layer groups refs to easily toggle visibility
   const nodeEntitiesGroupRef = useRef<any[]>([]);
+  const relationEntitiesGroupRef = useRef<any[]>([]);
   const hydrologyEntitiesGroupRef = useRef<any[]>([]);
   const tacticalZoneEntitiesGroupRef = useRef<any[]>([]);
 
@@ -175,106 +181,8 @@ export function useCesiumViewer({
     });
 
     // Reset list refs
-    nodeEntitiesGroupRef.current = [];
     hydrologyEntitiesGroupRef.current = [];
     tacticalZoneEntitiesGroupRef.current = [];
-
-    INITIAL_NODES.forEach((node) => {
-      const color = NODE_COLORS[node.type] || "#16a34a";
-      const glassColor = Cesium.Color.fromCssColorString(color).withAlpha(0.25);
-
-      // 1. Hexagonal Tower Cylinder
-      const towerCylinder = viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 25),
-        cylinder: {
-          length: 50,
-          topRadius: 16,
-          bottomRadius: 16,
-          slices: 6,
-          material: glassColor,
-          outline: false
-        },
-        show: mapLayers.nodes
-      });
-      nodeEntitiesGroupRef.current.push(towerCylinder);
-
-      // 2. Vertical Beacon Line
-      const beaconLine = viewer.entities.add({
-        polyline: {
-          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
-            node.lon, node.lat, 0,
-            node.lon, node.lat, 180
-          ]),
-          width: 1.5,
-          material: Cesium.Color.fromCssColorString(color).withAlpha(0.75)
-        },
-        show: mapLayers.nodes
-      });
-      nodeEntitiesGroupRef.current.push(beaconLine);
-
-      // 3. Ground ellipse Ring
-      const ellipseRing = viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat),
-        ellipse: {
-          semiMajorAxis: 90,
-          semiMinorAxis: 90,
-          material: Cesium.Color.fromCssColorString(color).withAlpha(0.1),
-          outline: false,
-          height: 0
-        },
-        show: mapLayers.nodes
-      });
-      nodeEntitiesGroupRef.current.push(ellipseRing);
-
-      // 4. Primary Label Point & Text
-      const nodeEntity = viewer.entities.add({
-        id: node.id,
-        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
-        point: {
-          pixelSize: 10,
-          color: Cesium.Color.fromCssColorString(color),
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 2.5,
-          disableDepthTestDistance: Number.POSITIVE_INFINITY
-        },
-        label: {
-          text: node.name.toUpperCase(),
-          font: "bold 42px Share Tech Mono, monospace",
-          fillColor: Cesium.Color.fromCssColorString("#0f172a"),
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineColor: Cesium.Color.WHITE,
-          outlineWidth: 6,
-          showBackground: false,
-          scale: 0.3,
-          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-          pixelOffset: new Cesium.Cartesian2(0, -18),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY
-        },
-        show: mapLayers.nodes
-      });
-      nodeEntitiesRef.current[node.id] = nodeEntity;
-      nodeEntitiesGroupRef.current.push(nodeEntity);
-
-      // 5. Coordinates Label
-      const coordLabel = viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
-        label: {
-          text: `[${node.id}] ${node.lat.toFixed(4)}°N ${node.lon.toFixed(4)}°E`,
-          font: "bold 28px JetBrains Mono, monospace",
-          fillColor: Cesium.Color.fromCssColorString("#475569"),
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          outlineColor: Cesium.Color.WHITE.withAlpha(0.95),
-          outlineWidth: 5,
-          showBackground: false,
-          scale: 0.3,
-          verticalOrigin: Cesium.VerticalOrigin.TOP,
-          pixelOffset: new Cesium.Cartesian2(0, 10),
-          disableDepthTestDistance: Number.POSITIVE_INFINITY
-        },
-        show: mapLayers.nodes
-      });
-      nodeEntitiesGroupRef.current.push(coordLabel);
-    });
 
     const riverCoordsArray = SAN_RIVER_COORDS.flatMap(c => [c.lon, c.lat]);
     
@@ -781,12 +689,180 @@ export function useCesiumViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Toggle visibility of Critical Nodes
+  // Synchronize Nodes on the Map (Dynamic and reactive to new nodes or status changes)
   useEffect(() => {
-    nodeEntitiesGroupRef.current.forEach(entity => {
-      if (entity) entity.show = mapLayers.nodes;
+    const viewer = viewerRef.current;
+    const Cesium = (window as any).Cesium;
+    if (!viewer || !Cesium || !isCesiumLoaded) return;
+
+    // Clear old node entities
+    nodeEntitiesGroupRef.current.forEach((entity) => {
+      viewer.entities.remove(entity);
     });
-  }, [mapLayers.nodes, isCesiumLoaded]);
+    nodeEntitiesGroupRef.current = [];
+    nodeEntitiesRef.current = {};
+
+    // Render nodes
+    nodes.forEach((node) => {
+      const color = NODE_COLORS[node.type] || "#16a34a";
+      const glassColor = Cesium.Color.fromCssColorString(color).withAlpha(0.25);
+
+      // 1. Hexagonal Tower Cylinder
+      const towerCylinder = viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 25),
+        cylinder: {
+          length: 50,
+          topRadius: 16,
+          bottomRadius: 16,
+          slices: 6,
+          material: glassColor,
+          outline: false
+        },
+        show: mapLayers.nodes
+      });
+      nodeEntitiesGroupRef.current.push(towerCylinder);
+
+      // 2. Vertical Beacon Line
+      const beaconLine = viewer.entities.add({
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+            node.lon, node.lat, 0,
+            node.lon, node.lat, 180
+          ]),
+          width: 1.5,
+          material: Cesium.Color.fromCssColorString(color).withAlpha(0.75)
+        },
+        show: mapLayers.nodes
+      });
+      nodeEntitiesGroupRef.current.push(beaconLine);
+
+      // 3. Ground ellipse Ring
+      const ellipseRing = viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat),
+        ellipse: {
+          semiMajorAxis: 90,
+          semiMinorAxis: 90,
+          material: Cesium.Color.fromCssColorString(color).withAlpha(0.1),
+          outline: false,
+          height: 0
+        },
+        show: mapLayers.nodes
+      });
+      nodeEntitiesGroupRef.current.push(ellipseRing);
+
+      // 4. Primary Label Point & Text
+      const nodeEntity = viewer.entities.add({
+        id: node.id,
+        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
+        point: {
+          pixelSize: 10,
+          color: Cesium.Color.fromCssColorString(color),
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 2.5,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        label: {
+          text: node.name.toUpperCase(),
+          font: "bold 42px Share Tech Mono, monospace",
+          fillColor: Cesium.Color.fromCssColorString("#0f172a"),
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 6,
+          showBackground: false,
+          scale: 0.3,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -18),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        show: mapLayers.nodes
+      });
+      nodeEntitiesRef.current[node.id] = nodeEntity;
+      nodeEntitiesGroupRef.current.push(nodeEntity);
+
+      // 5. Coordinates Label
+      const coordLabel = viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
+        label: {
+          text: `[${node.id}] ${node.lat.toFixed(4)}°N ${node.lon.toFixed(4)}°E`,
+          font: "bold 28px JetBrains Mono, monospace",
+          fillColor: Cesium.Color.fromCssColorString("#475569"),
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          outlineColor: Cesium.Color.WHITE.withAlpha(0.95),
+          outlineWidth: 5,
+          showBackground: false,
+          scale: 0.3,
+          verticalOrigin: Cesium.VerticalOrigin.TOP,
+          pixelOffset: new Cesium.Cartesian2(0, 10),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        show: mapLayers.nodes
+      });
+      nodeEntitiesGroupRef.current.push(coordLabel);
+    });
+  }, [nodes, mapLayers.nodes, isCesiumLoaded]);
+
+  // Synchronize Relations on the Map (Dynamic and reactive to new relations)
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const Cesium = (window as any).Cesium;
+    if (!viewer || !Cesium || !isCesiumLoaded) return;
+
+    // Clear old relation entities
+    relationEntitiesGroupRef.current.forEach((entity) => {
+      viewer.entities.remove(entity);
+    });
+    relationEntitiesGroupRef.current = [];
+
+    // Render relations
+    relations.forEach((rel) => {
+      const sourceNode = nodes.find(n => n.id === rel.source);
+      const targetNode = nodes.find(n => n.id === rel.target);
+      if (!sourceNode || !targetNode) return;
+
+      const color = sourceNode.status === "DESTROYED" 
+        ? Cesium.Color.RED 
+        : sourceNode.status === "DEGRADED" 
+        ? Cesium.Color.ORANGE 
+        : Cesium.Color.CYAN;
+
+      const polylineEntity = viewer.entities.add({
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+            sourceNode.lon, sourceNode.lat, 25,
+            targetNode.lon, targetNode.lat, 25
+          ]),
+          width: 3.5,
+          material: new Cesium.PolylineGlowMaterialProperty({
+            glowPower: 0.25,
+            color: color.withAlpha(0.7)
+          })
+        },
+        show: mapLayers.relations
+      });
+
+      relationEntitiesGroupRef.current.push(polylineEntity);
+
+      // Label at middle position of the relation
+      const midLon = (sourceNode.lon + targetNode.lon) / 2;
+      const midLat = (sourceNode.lat + targetNode.lat) / 2;
+      const labelEntity = viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(midLon, midLat, 45),
+        label: {
+          text: rel.label.toUpperCase(),
+          font: "bold 24px Share Tech Mono, monospace",
+          fillColor: color,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 4,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          scale: 0.35,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        show: mapLayers.relations
+      });
+
+      relationEntitiesGroupRef.current.push(labelEntity);
+    });
+  }, [relations, nodes, mapLayers.relations, isCesiumLoaded]);
 
   // Toggle visibility of Hydrology (River San)
   useEffect(() => {

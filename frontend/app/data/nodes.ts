@@ -99,3 +99,14 @@ export const NODE_COLORS: Record<string, string> = {
   transit: "#7c3aed",
   hq: "#047857"
 };
+
+import { NodeRelation } from "../types";
+
+export const INITIAL_RELATIONS: NodeRelation[] = [
+  { source: "OBJ_03", target: "OBJ_02", label: "CHŁODZIWO" }, // Water Intake -> Power Plant
+  { source: "OBJ_05", target: "OBJ_02", label: "PALIWO" },    // Gas Node -> Power Plant
+  { source: "OBJ_02", target: "OBJ_03", label: "ZASILANIE" }, // Power Plant -> Water Intake pumps
+  { source: "OBJ_02", target: "OBJ_01", label: "ZASILANIE" }, // Power Plant -> HSW Factory
+  { source: "OBJ_04", target: "OBJ_07", label: "ZASILANIE" }, // GPZ Substation -> Crisis HQ
+  { source: "OBJ_06", target: "OBJ_07", label: "TELCO" }      // San Tower -> Crisis HQ
+];

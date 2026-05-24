@@ -1,6 +1,6 @@
 "use client";
 
-import { SidebarTab, CriticalNode } from "../types";
+import { SidebarTab, CriticalNode, NodeRelation } from "../types";
 import { CollapsibleCard } from "./CollapsibleCard";
 import { NodeList } from "./NodeList";
 import { CascadeGraph } from "./CascadeGraph";
@@ -10,9 +10,12 @@ interface LeftSidebarProps {
   activeTab: SidebarTab;
   onTabChange: (tab: SidebarTab) => void;
   nodes: CriticalNode[];
+  relations: NodeRelation[];
   coolingSecondsLeft: number | null;
   waterSecondsLeft: number | null;
   onNodeClick: (node: CriticalNode) => void;
+  onAddNode: (node: CriticalNode) => void;
+  onAddRelation: (rel: NodeRelation) => void;
   playbookActive: string | null;
   onActivatePlaybook: (id: string, name: string) => void;
   onStopPlaybook: () => void;
@@ -24,9 +27,12 @@ export function LeftSidebar({
   activeTab,
   onTabChange,
   nodes,
+  relations,
   coolingSecondsLeft,
   waterSecondsLeft,
   onNodeClick,
+  onAddNode,
+  onAddRelation,
   playbookActive,
   onActivatePlaybook,
   onStopPlaybook,
@@ -82,7 +88,15 @@ export function LeftSidebar({
         </div>
 
         <div className="p-3 overflow-y-auto terminal-scroll flex-1 min-h-0">
-          {activeTab === "details" && <NodeList nodes={nodes} onNodeClick={onNodeClick} />}
+          {activeTab === "details" && (
+            <NodeList
+              nodes={nodes}
+              relations={relations}
+              onNodeClick={onNodeClick}
+              onAddNode={onAddNode}
+              onAddRelation={onAddRelation}
+            />
+          )}
           {activeTab === "cascades" && (
             <CascadeGraph nodes={nodes} coolingSecondsLeft={coolingSecondsLeft} waterSecondsLeft={waterSecondsLeft} />
           )}
