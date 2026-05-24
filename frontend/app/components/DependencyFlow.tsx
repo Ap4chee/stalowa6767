@@ -12,7 +12,8 @@ import {
   Edge,
   useNodesState,
   useEdgesState,
-  BackgroundVariant
+  BackgroundVariant,
+  Connection
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { CriticalNode } from "../types";
@@ -223,6 +224,28 @@ export function DependencyFlow({
     setCustomLabel("");
   };
 
+  // Connection Confirmation Modal States
+  const [pendingConnection, setPendingConnection] = useState<Connection | null>(null);
+  const [pendingLabel, setPendingLabel] = useState("ZASILANIE");
+  const [customPendingLabel, setCustomPendingLabel] = useState("");
+
+  const handleConfirmConnection = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingConnection || !pendingConnection.source || !pendingConnection.target || !onAddRelation) return;
+
+    const labelVal = pendingLabel === "CUSTOM" ? customPendingLabel : pendingLabel;
+    if (!labelVal.trim()) return;
+
+    onAddRelation({
+      source: pendingConnection.source,
+      target: pendingConnection.target,
+      label: labelVal.toUpperCase()
+    });
+
+    setPendingConnection(null);
+  };
+
+
   // Construct initial flow nodes state (only runs once on mount)
   const initialNodes = React.useMemo<Node[]>(() => {
     return nodes.map((node) => ({
@@ -310,6 +333,17 @@ export function DependencyFlow({
   useEffect(() => {
     setFlowEdges(initialEdges);
   }, [initialEdges, setFlowEdges]);
+
+  const onConnect = React.useCallback(
+    (params: Connection) => {
+      if (!params.source || !params.target || params.source === params.target) return;
+      // Open interactive confirmation modal to label this new relation flow
+      setPendingConnection(params);
+      setPendingLabel("ZASILANIE");
+      setCustomPendingLabel("");
+    },
+    []
+  );
 
   return (
     <div className="w-full h-full min-h-0 theme-bg-app relative select-none">
@@ -537,6 +571,7 @@ export function DependencyFlow({
         edges={flowEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.15 }}
@@ -576,6 +611,75 @@ export function DependencyFlow({
           }}
         />
       </ReactFlow>
+
+      {/* Interactive Drag-and-Link Confirmation Dialog */}
+      {pendingConnection && (
+        <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-auto">
+          <div className="w-80 theme-bg-panel border border-cyan-500/50 p-4 rounded shadow-2xl font-mono text-[10px] theme-text-primary clip-chamfer">
+            <div className="flex justify-between items-center pb-2 border-b theme-border mb-3">
+              <span className="font-rajdhani font-extrabold tracking-wider text-[11px] theme-neon-text">KLASYFIKACJA POWIĄZANIA</span>
+              <button onClick={() => setPendingConnection(null)} className="text-slate-400 hover:text-white cursor-pointer">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            
+            <p className="text-[8px] theme-text-muted mb-3 leading-relaxed">
+              Utworzono połączenie fizyczne pomiędzy węzłami: <br />
+              <span className="theme-text-primary font-bold">{nodes.find(n => n.id === pendingConnection.source)?.name}</span> ➔ <span className="theme-text-primary font-bold">{nodes.find(n => n.id === pendingConnection.target)?.name}</span>
+            </p>
+
+            <form onSubmit={handleConfirmConnection} className="space-y-3.5">
+              <div>
+                <label className="block text-[8px] theme-text-muted mb-1">KATEGORIA STRUMIENIA PRZEPŁYWU:</label>
+                <select
+                  value={pendingLabel}
+                  onChange={(e) => setPendingLabel(e.target.value)}
+                  className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                >
+                  <option value="ZASILANIE">ZASILANIE (ELEKTRYCZNE)</option>
+                  <option value="PALIWO">PALIWO (GAZ / MAZUT)</option>
+                  <option value="CHŁODZIWO">CHŁODZIWO (WODA HYDROGRAFICZNA)</option>
+                  <option value="TELCO">TELCO (ŁĄCZNOŚĆ ŚWIATŁOWODOWA)</option>
+                  <option value="DOWODZENIE">DOWODZENIE (STRATEGICZNE / C2)</option>
+                  <option value="LOGISTYKA">LOGISTYKA (ZAOPATRZENIE SPALNE)</option>
+                  <option value="CUSTOM">INNY / ZDEFINIUJ RĘCZNIE...</option>
+                </select>
+              </div>
+
+              {pendingLabel === "CUSTOM" && (
+                <div>
+                  <label className="block text-[8px] theme-text-muted mb-1">ZDEFINIUJ WŁASNY TYP PRZEPŁYWU:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="np. SENSORY / WIDEO"
+                    value={customPendingLabel}
+                    onChange={(e) => setCustomPendingLabel(e.target.value)}
+                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] uppercase"
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPendingConnection(null)}
+                  className="w-full py-1.5 theme-bg-app border theme-border hover:theme-neon-border text-slate-400 hover:text-white font-bold text-[9px] tracking-wider clip-chamfer transition-all cursor-pointer"
+                >
+                  ANULUJ
+                </button>
+                <button
+                  type="submit"
+                  className="w-full py-1.5 theme-bg-app border border-cyan-500 hover:bg-cyan-500/20 theme-neon-text font-bold text-[9px] tracking-wider clip-chamfer transition-all cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <LinkIcon className="w-3 h-3 text-cyan-400" />
+                  <span>POTWIERDŹ</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
