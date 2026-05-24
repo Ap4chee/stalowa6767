@@ -18,6 +18,9 @@ interface ObjectDetailCardProps {
   onRelocateSystem?: (sysId: string, lat: number, lon: number, seconds: number) => void;
   onFlyTo: (lat: number, lon: number, name: string) => void;
   leftSidebarCollapsed?: boolean;
+  onStartRelocationDrag?: (sysId: string) => void;
+  onCancelRelocationDrag?: () => void;
+  isRelocationDragging?: boolean;
 }
 
 // Distance helper
@@ -57,7 +60,10 @@ export function ObjectDetailCard({
   onRemoveSystem,
   onRelocateSystem,
   onFlyTo,
-  leftSidebarCollapsed = false
+  leftSidebarCollapsed = false,
+  onStartRelocationDrag,
+  onCancelRelocationDrag,
+  isRelocationDragging = false
 }: ObjectDetailCardProps) {
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -410,8 +416,13 @@ export function ObjectDetailCard({
           </div>
 
           {selectedSystem.status === "RELOCATING" && (
-            <div className="bg-amber-500/10 border border-amber-500/30 p-2 text-[9px] text-amber-500 leading-normal animate-pulse">
-              <span className="font-bold">STATUS MARSZU:</span> Bateria jest w trakcie relokacji taktycznej. Wszystkie systemy bojowe są wyłączone do czasu dotarcia do celu.
+            <div className="bg-amber-500/10 border border-amber-500/30 p-2 text-[9px] text-amber-500 leading-normal animate-pulse flex flex-col gap-1">
+              <div>
+                <span className="font-bold">STATUS MARSZU:</span> Bateria jest w trakcie relokacji taktycznej. Wszystkie systemy bojowe są wyłączone do czasu dotarcia do celu.
+              </div>
+              <div className="text-[8px] text-amber-500/70 italic border-t border-amber-500/20 pt-1">
+                * Na potrzeby demo czas marszu skrócono do 5 sekund.
+              </div>
             </div>
           )}
 
@@ -434,8 +445,8 @@ export function ObjectDetailCard({
             )}
           </div>
 
-          {/* Action buttons (only show if not relocating and form not open) */}
-          {!isRelocatingFormOpen && selectedSystem.status !== "RELOCATING" && (
+          {/* Action buttons (only show if not relocating and dragging is not active) */}
+          {!isRelocationDragging && selectedSystem.status !== "RELOCATING" && (
             <div className="grid grid-cols-3 gap-2 mt-1">
               <button
                 onClick={() => onFlyTo(selectedSystem.lat, selectedSystem.lon, selectedSystem.name)}
@@ -446,7 +457,7 @@ export function ObjectDetailCard({
               </button>
 
               <button
-                onClick={() => setIsRelocatingFormOpen(true)}
+                onClick={() => onStartRelocationDrag && onStartRelocationDrag(selectedSystem.id)}
                 className="py-2 border border-cyan-550/40 bg-cyan-500/5 text-cyan-400 hover:bg-cyan-550/20 hover:text-cyan-300 transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1 cursor-pointer"
               >
                 <Settings2 className="w-3.5 h-3.5" />
@@ -463,55 +474,21 @@ export function ObjectDetailCard({
             </div>
           )}
 
-          {/* Relocation Config Form */}
-          {isRelocatingFormOpen && (
-            <div className="mt-1 pt-2.5 border-t border-cyan-500/20 flex flex-col gap-2 bg-black/10 p-2 rounded">
-              <span className="text-[8px] text-cyan-400 font-bold uppercase tracking-wider">
-                KONFIGURACJA TRASY PRZEMIESZCZENIA
+          {/* Relocation Interactive Guide Panel */}
+          {isRelocationDragging && (
+            <div className="mt-1 pt-2.5 border-t border-amber-500/20 flex flex-col gap-2 bg-amber-500/5 p-2.5 rounded animate-pulse">
+              <span className="text-[8px] text-amber-500 font-bold uppercase tracking-wider">
+                TRYB WYZNACZANIA POZYCJI (DUSZEK 3D)
               </span>
-              <div className="flex items-center gap-2">
-                <div className="flex flex-col flex-1">
-                  <label className="text-[7.5px] theme-text-muted">SZEROKOŚĆ (LAT)</label>
-                  <input
-                    type="text"
-                    value={targetLat}
-                    onChange={(e) => setTargetLat(e.target.value)}
-                    className="w-full theme-bg-panel border border-slate-700 p-1 text-[9px] font-mono text-cyan-300 outline-none focus:border-cyan-500"
-                  />
-                </div>
-                <div className="flex flex-col flex-1">
-                  <label className="text-[7.5px] theme-text-muted">DŁUGOŚĆ (LON)</label>
-                  <input
-                    type="text"
-                    value={targetLon}
-                    onChange={(e) => setTargetLon(e.target.value)}
-                    className="w-full theme-bg-panel border border-slate-700 p-1 text-[9px] font-mono text-cyan-300 outline-none focus:border-cyan-500"
-                  />
-                </div>
-              </div>
-
-              {/* Distance & Time Estimate */}
-              {est && (
-                <div className="p-1 px-2 bg-cyan-950/20 border border-cyan-500/20 text-[8px] font-mono theme-text-secondary flex justify-between">
-                  <span>DYSTANS: {est.distance} KM</span>
-                  <span className="text-cyan-400 font-bold">EST. CZAS: {est.seconds} SEKUND</span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2 mt-1">
-                <button
-                  onClick={handleConfirmRelocation}
-                  className="px-2.5 py-1.5 border border-emerald-500 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 transition-all font-bold text-[9px] clip-chamfer cursor-pointer flex items-center gap-1"
-                >
-                  ZATWIERDŹ MARSZ
-                </button>
-                <button
-                  onClick={() => setIsRelocatingFormOpen(false)}
-                  className="px-2 py-1.5 border border-slate-600 bg-slate-500/10 text-slate-400 hover:bg-slate-550/25 transition-all font-bold text-[9px] clip-chamfer cursor-pointer flex items-center gap-1 ml-auto"
-                >
-                  ANULUJ
-                </button>
-              </div>
+              <p className="text-[9px] theme-text-secondary leading-tight">
+                Przesuń kursor myszy nad mapę, aby przesunąć <span className="text-amber-400 font-bold">"duszek"</span> oraz strefę zasięgu baterii. Następnie <span className="text-amber-400 font-bold">kliknij lewym przyciskiem myszy</span> w nowym miejscu, aby obliczyć czas marszu i wydać ostateczny rozkaz.
+              </p>
+              <button
+                onClick={() => onCancelRelocationDrag && onCancelRelocationDrag()}
+                className="w-full mt-1 py-1.5 border border-slate-650 bg-slate-500/10 hover:bg-slate-550/25 text-slate-400 transition-all font-semibold text-[10px] font-rajdhani clip-chamfer cursor-pointer flex items-center justify-center"
+              >
+                ANULUJ WYZNACZANIE
+              </button>
             </div>
           )}
         </div>

@@ -136,6 +136,15 @@ export default function SteelSentinelDashboard() {
 
   const [selectedNode, setSelectedNode] = useState<CriticalNode | null>(null);
   const [selectedSystem, setSelectedSystem] = useState<DeployedSystem | null>(null);
+  const [isRelocationDragging, setIsRelocationDragging] = useState(false);
+  const [relocationConfirmation, setRelocationConfirmation] = useState<{
+    sysId: string;
+    lat: number;
+    lon: number;
+    distance: number;
+    seconds: number;
+    realTime: string;
+  } | null>(null);
 
   const cesiumContainerRef = useRef<HTMLDivElement>(null);
 
@@ -179,13 +188,69 @@ export default function SteelSentinelDashboard() {
     }
   }, [playBeep]);
 
+  // Distance helper
+  const calculateDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Format real travel time assuming tactical convoy speeds
+  const formatRealTime = (distanceKm: number, type: string) => {
+    // patriot moves at 40km/h (heavy), pilica at 60km/h (medium), radar at 50km/h
+    const speedKmh = type === "PATRIOT" ? 40 : type === "PILICA" ? 60 : 50;
+    const hours = distanceKm / speedKmh;
+    const totalSeconds = Math.round(hours * 3600);
+    
+    if (totalSeconds < 60) {
+      return `${totalSeconds} sek.`;
+    }
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainingSeconds = totalSeconds % 60;
+    if (minutes < 60) {
+      return `${minutes} min. ${remainingSeconds} sek.`;
+    }
+    const remainingMinutes = minutes % 60;
+    const finalHours = Math.floor(minutes / 60);
+    return `${finalHours} godz. ${remainingMinutes} min.`;
+  };
+
+  const handleConfirmRelocationPosition = useCallback((sysId: string, lat: number, lon: number) => {
+    const matched = deployedSystems.find(s => s.id === sysId);
+    if (!matched) return;
+
+    const distance = calculateDistanceKm(matched.lat, matched.lon, lat, lon);
+    const realTime = formatRealTime(distance, matched.type);
+    // Demo mode: Force the actual simulation relocation countdown to exactly 5 seconds
+    const seconds = 5;
+
+    setRelocationConfirmation({
+      sysId,
+      lat,
+      lon,
+      distance,
+      seconds,
+      realTime
+    });
+  }, [deployedSystems]);
+
   const {
     viewerRef,
     nodeEntitiesRef,
     flyToNode,
     resetViewer,
     removeDeployedSystem,
-    drawDeployedSystem
+    drawDeployedSystem,
+    startRelocationDrag,
+    cancelRelocationDrag
   } = useCesiumViewer({
     containerRef: cesiumContainerRef,
     simStateRef,
@@ -203,7 +268,8 @@ export default function SteelSentinelDashboard() {
     mapLayers,
     nodes,
     relations,
-    baseMapType
+    baseMapType,
+    onConfirmRelocationPosition: handleConfirmRelocationPosition
   });
 
   useEffect(() => {
@@ -606,6 +672,10 @@ export default function SteelSentinelDashboard() {
         onClose={() => {
           setSelectedNode(null);
           setSelectedSystem(null);
+          if (isRelocationDragging) {
+            setIsRelocationDragging(false);
+            cancelRelocationDrag();
+          }
         }}
         onActivateBackupPower={handleActivateBackupPower}
         coolingSecondsLeft={coolingSecondsLeft}
@@ -616,7 +686,98 @@ export default function SteelSentinelDashboard() {
         onRelocateSystem={handleRelocateSystem}
         onFlyTo={flyToNode}
         leftSidebarCollapsed={leftPanelCollapsed}
+        isRelocationDragging={isRelocationDragging}
+        onStartRelocationDrag={(sysId) => {
+          setIsRelocationDragging(true);
+          startRelocationDrag(sysId);
+        }}
+        onCancelRelocationDrag={() => {
+          setIsRelocationDragging(false);
+          cancelRelocationDrag();
+        }}
       />
+
+      {relocationConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm font-mono p-4">
+          <div className="w-[450px] theme-bg-panel border border-amber-500/50 p-5 clip-chamfer shadow-2xl flex flex-col gap-4">
+            <div className="flex justify-between items-center border-b border-amber-500/30 pb-2">
+              <span className="text-xs theme-neon-text font-bold tracking-wider font-rajdhani text-amber-500">
+                POTWIERDZENIE PRZEMIESZCZENIA BATERII
+              </span>
+              <span className="text-[10px] bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-amber-400 font-bold">
+                ROZKAZ MARSZU
+              </span>
+            </div>
+            
+            <p className="text-[11px] theme-text-primary leading-relaxed">
+              Czy chcesz zatwierdzić rozkaz dyslokacji jednostki{" "}
+              <span className="text-amber-400 font-bold uppercase">
+                {deployedSystems.find(s => s.id === relocationConfirmation.sysId)?.name}
+              </span>{" "}
+              na nową pozycję bojową?
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 text-[10px] theme-bg-app p-3 border theme-border">
+              <div className="flex flex-col">
+                <span className="text-[8px] theme-text-muted">POZYCJA DOCELOWA</span>
+                <span className="font-bold theme-text-primary">
+                  {relocationConfirmation.lat.toFixed(5)}°N, {relocationConfirmation.lon.toFixed(5)}°E
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[8px] theme-text-muted">DYSTANS MARSZU</span>
+                <span className="font-bold theme-text-primary">
+                  {relocationConfirmation.distance.toFixed(2)} KM
+                </span>
+              </div>
+              <div className="flex flex-col mt-2 col-span-2 border-t theme-border pt-2">
+                <span className="text-[8px] theme-text-muted">SZACOWANY REALNY CZAS MARSZU KOLUMNY</span>
+                <span className="font-bold text-amber-400 text-xs font-sharetech">
+                  {relocationConfirmation.realTime}
+                </span>
+                <span className="text-[8px] text-slate-500 mt-1 italic block leading-snug">
+                  * Na potrzeby prezentacji (demo) czas przejazdu skrócono do 5 sekund.
+                </span>
+              </div>
+              <div className="flex flex-col mt-1 col-span-2">
+                <span className="text-[8px] theme-text-muted">STAN BATERII W TRANZYCIE</span>
+                <span className="font-bold text-red-500 text-[10px] uppercase">
+                  NIEAKTYWNY / WYŁĄCZONY Z SYS. OBRONY
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                onClick={() => {
+                  handleRelocateSystem(
+                    relocationConfirmation.sysId,
+                    relocationConfirmation.lat,
+                    relocationConfirmation.lon,
+                    relocationConfirmation.seconds
+                  );
+                  setIsRelocationDragging(false);
+                  cancelRelocationDrag();
+                  setRelocationConfirmation(null);
+                }}
+                className="flex-1 py-2 border border-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400 transition-all font-bold text-xs clip-chamfer cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                ZATWIERDŹ MARSZ
+              </button>
+              <button
+                onClick={() => {
+                  setIsRelocationDragging(false);
+                  cancelRelocationDrag();
+                  setRelocationConfirmation(null);
+                }}
+                className="flex-1 py-2 border border-slate-600 bg-slate-500/10 hover:bg-slate-550/25 text-slate-400 transition-all font-bold text-xs clip-chamfer cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                ANULUJ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <ThreatModelViewer
         isOpen={threatViewerOpen}
         onClose={() => setThreatViewerOpen(false)}

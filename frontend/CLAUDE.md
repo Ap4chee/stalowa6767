@@ -38,11 +38,11 @@ Aplikacja jest w pełni samodzielnym (zero backendu) dashboardem typu C2 (Comman
 
 ## Typy (app/types/index.ts)
 
-- `CriticalNode` — węzeł infrastruktury krytycznej (id, name, lat, lon, type, health %, status, backupPower, notes)
-- `WeaponSystem` — definicja systemu obronnego (type, range, color, threatsCovered)
-- `DeployedSystem` — zainstalowany system na mapie (id, type, lat, lon, radius)
-- `ThreatType` — typ zagrożenia (speed, alt, immuneToWRE)
-- `Threat` — aktywne zagrożenie (position, targetId, pathType, progress, status, health)
+- `CriticalNode` — węzeł infrastruktury krytycznej (id, name, lat, lon, type, description, health %, status, backupPower, notes)
+- `WeaponSystem` — definicja systemu obronnego (type, name, range, color, colorHex, description, threatsCovered)
+- `DeployedSystem` — zainstalowany system na mapie (id, type, name, lat, lon, radius, color, status?, relocationSecondsLeft?, targetLat?, targetLon?)
+- `ThreatType` — typ zagrożenia (type, name, speed, alt, description, immuneToWRE)
+- `Threat` — aktywne zagrożenie (id, type, name, startLat/Lon, lat/lon, alt, targetId, pathType, progress, status, health)
 - `LogEntry` — wpis w konsoli zdarzeń (timestamp, text, type)
 - `HoveredCoords` — współrzędne pod kursorem (lat, lon, alt, az)
 - `NodeRelation` — relacja między węzłami (source, target, label)
@@ -89,7 +89,7 @@ Aplikacja jest w pełni samodzielnym (zero backendu) dashboardem typu C2 (Comman
 ### useAudio.ts
 - Zwraca `{ playBeep }`
 - Tworzy `AudioContext` + `OscillatorNode` + `GainNode`
-- Parametry: frequency (Hz), waveform type (sine/sawtooth/triangle/square), duration
+- Parametry: frequency (Hz), waveform type, duration
 - No-op gdy `soundEnabled === false`
 - Łapie wyjątki związane z autoplay blocking (try/catch)
 
@@ -97,7 +97,7 @@ Aplikacja jest w pełni samodzielnym (zero backendu) dashboardem typu C2 (Comman
 - 1-sekundowy `setInterval`
 - Główna pętla awarii kaskadowych:
   - Elektrownia (OBJ_02) zniszczona/degradowana → Huta traci zasilanie (health spada do 15%) + Ujęcie wody traci pompy (drenaż rezerw 12h)
-  - Woda (OBJ_03) zniszczona → Elektrownia traci chłodzenie (6-sekundowe wygaszanie turbiny)  
+  - Woda (OBJ_03) zniszczona/wyczerpanie → Elektrownia traci chłodzenie (6-sekundowe wygaszanie turbiny)
   - GPZ Maziarnia (OBJ_04) zniszczony → Centrum Kryzysowe (OBJ_07) spada do 40% health
   - Aktualizuje kolory encji na Cesium (zielony → żółty → czerwony)
 
@@ -110,7 +110,7 @@ Aplikacja jest w pełni samodzielnym (zero backendu) dashboardem typu C2 (Comman
   - 1: Zniszczono ≥3 węzły
 - Loguje zmianę poziomu
 
-### useCesiumViewer.ts (~966 linii — największy plik)
+### useCesiumViewer.ts (~1455 linii — największy plik)
 Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 
 **Inicjalizacja:**
@@ -118,7 +118,7 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 - Ustawia kamerę na Stalową Wolę z wysokości ~4500m
 - Dodaje `PolylineCollection` dla laserów
 - Renderuje rzekę San (glow + core + label)
-- Dodaje `ScreenSpaceEventHandler` dla mouse move (throttled 80ms → hoveredCoords) i left click (deployment mode vs entity picking)
+- Dodaje `ScreenSpaceEventHandler` dla mouse move (throttled 80ms) i left click
 
 **Renderowanie węzłów:**
 - Dla każdego węzła: cylinder (6-boczny, glass), beacon line, ellipse ring, point + label + coord label
@@ -135,19 +135,36 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 - Dla PATRIOT / PILICA: ładuje rzeczywisty model 3D GLB
 - Dla pozostałych: cylinder (5-boczny) + beacon + label
 
+**Relokacja systemów (przeciąganie):**
+- `startRelocationDrag(sysId)` — tworzy ghost entities (model, dome, label) podążające za kursorem
+- `MOUSE_MOVE` — aktualizuje pozycję ghost entities
+- `LEFT_CLICK` w trybie relokacji → wywołuje `onConfirmRelocationPosition`
+- `cancelRelocationDrag()` — czyści ghost entities
+- `drawDeployedSystem(sys)` — przerysowuje system (używane przy aktualizacji statusu RELOCATING)
+
 **Pętla symulacji (requestAnimationFrame):**
 - Porusza zagrożenia po ścieżkach (DIRECT lub RIVER)
 - Dla Shahed: nawigacja wzdłuż SAN_RIVER_COORDS + bank approach
-- Sprawdza odległość do systemów obronnych
+- Sprawdza odległość do systemów obronnych (pomija systemy z statusem RELOCATING)
 - Rysuje lasery (PolylineCollection: glow outer + solid inner)
 - Aplikuje obrażenia (PILICA: 0.9, PATRIOT: 1.8, WRE: 2.5)
 - Na zniszczeniu: usuwa encję, loguje combat, zmienia status
 - Na impakcie (progress ≥ 1.0): niszczy target node
 
+**Entity picking (drillPick):**
+- `drillPick` przebija przez przezroczyste kopuły
+- Priorytetyzuje modele/beacony/towers nad domami
+- Rozpoznaje entity po ID: OBJ_* (node), SYS_* (system), suffix _model/_tower/_beacon
+- Kliknięcie w cluster indicator → flyTo nad miasto
+
 **Zmiana podkładu mapy:**
 - Standard: CartoDB (light/dark w zależności od theme)
 - Satellite: Esri World Imagery
 - Topo: Esri World Topo Map
+
+**Cluster indicator:**
+- Gdy kamera oddali się >28km → pokazuje zgrupowanie obiektów
+- Klikalny, zlicza obiekty + systemy
 
 ---
 
@@ -157,9 +174,16 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 - Logo "STEEL SENTINEL" + badge wersji
 - Przycisk "SCHEMAT POWIĄZAŃ" (toggle DependencyFlow)
 - Przycisk "BAZA OBIEKTÓW 3D" (otwiera ThreatModelViewer)
-- Wskaźnik ZAGROŻENIE (1-5) z kolorami: zielony/żółty/pomarańczowy/czerwony
+- Wskaźnik DEFCON (1-5) z kolorami: emerald/cyan/amber/orange/red + kropka
 - Zegar UTC
 - Przyciski: motyw (light/dark), dźwięk (on/off)
+
+### DefconOverlay.tsx — NOWY
+- Overlay pojawiający się przy zmianie poziomu DEFCON
+- Auto-znika po 6s (lub ręcznie przez ZATWIERDŹ/ESC/X)
+- Pasek u góry: "STATUS GOTOWOŚCI: DEFCON X" + nazwa
+- Czerwona poświata na krawędziach ekranu (dla DEFCON ≤3 pulsująca)
+- Czerwona/bursztynowa belka z lewej strony
 
 ### AlertTicker.tsx
 - Pasek poniżej headera (fixed, top-12)
@@ -169,15 +193,14 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 
 ### CesiumViewport.tsx
 - Container `<div>` dla CesiumJS canvas
-- Obsługuje split-screen (fade-out gdy schemaModeEnabled)
+- Obsługuje split-screen (fade-out gdy schema mode enabled)
 - `opacity-0 pointer-events-none invisible` gdy schemat aktywny
 
 ### LeftSidebar.tsx
-- Panel lewy z 3 zakładkami:
-  - **SZCZEGÓŁY** → NodeList
-  - **KASKADY** → CascadeGraph (z czerwonym ping gdy timery kaskad aktywne)
-  - **ALERT_CMD** → PlaybookControls
-- Zawinięty w CollapsibleCard
+- Panel lewy zawinięty w CollapsibleCard
+- Zawiera NodeList
+- Badge: liczba OPERATIONAL / total nodes
+- Header: "PANEL DOWODZENIA"
 
 ### NodeList.tsx
 - Lista wszystkich węzłów z ikonami (typ → lucide icon)
@@ -191,7 +214,7 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 - SVG graf zależności dla 5 węzłów (E2, H1, W3, G4, K7)
 - Strzałki kolorowane na zielono (OK) lub czerwono (destroyed)
 - Alerty kaskadowe: countdown timery dla wody (12h) i chłodzenia (6s)
-- Opisy tekstowe zależności: "Pętla sprzężenia chłodzenia (W3) 🔄 (E2)"
+- Opisy tekstowe zależności
 
 ### PlaybookControls.tsx
 - 3 przyciski procedur awaryjnych:
@@ -251,10 +274,12 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 - **Dragowalny** panel szczegółów (pointer events, clamped do okna)
 - Pozycja persistowana do localStorage
 - Double-click resetuje pozycję do domyślnej
-- **Tryb Node**: status badge, health bar, opis, notatki, mapa zależności kaskadowych, przyciski NAMIERZ GPS + URUCHOM GENERATORY
+- **Tryb Node**: status badge, health bar, GPS, opis, notatki, mapa zależności kaskadowych, przyciski NAMIERZ GPS + URUCHOM GENERATORY
   - Dla OBJ_02 (elektrownia): przycisk DODAJ CHŁODZIWO (resetuje cooling timer)
   - Dla OBJ_03 (ujęcie wody): przycisk DOŁADUJ POMPY (resetuje water timer)
-- **Tryb System**: zasięg, zwalczane cele, NAMIERZ GPS, ZDEMONTUJ SYSTEM
+- **Tryb System**: status (OPERATIONAL/RELOCATING), GPS, zasięg, zwalczane cele, przyciski NAMIERZ GPS, PRZEMIEŚĆ, ZDEMONTUJ
+  - Relocation drag mode UI (gdy `isRelocationDragging`): instrukcja wyznaczania pozycji
+  - Relocation form (ręczne wpisywanie target lat/lon z estymacją czasu marszu)
 
 ### DependencyFlow.tsx
 - **Pełnoekranowy widok schematu blokowego** z @xyflow/react
@@ -262,16 +287,17 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 - Krawędzie paraboliczne z kolorami: cyan (OK), żółty (degraded), czerwony (destroyed)
 - Drag-and-drop do tworzenia nowych relacji (z confirmation dialog + wybór typu przepływu)
 - MiniMap + Controls + Background (krzyżyki)
-- Panel edytora: dodawanie węzłów i relacji
+- **Floating editor panel** (KREATOR ELEMENTÓW SIECI): dodawanie węzłów / relacji z formularzami
 - Pozycje węzłów persistowane do localStorage
 
 ### ThreatModelViewer.tsx
 - **Pełnoekranowy przeglądarka 3D** (Three.js)
 - 4 modele GLB: FPV drone, Shahed-136, Patriot PAC-3, PSR-A Pilica
-- Auto-rotacja z OrbitControls
-- Panel info: designation, classification, specyfikacja, analiza wywiadowcza
+- Auto-rotacja z OrbitControls, reset kamery
+- Panel info: designation, classification, parametry techniczne, analiza wywiadowcza
 - **Katalog zagrożeń**: przyciski prev/next (lewo/prawo)
-- **Karty środków przeciwdziałania**: klikalne → modal z pełną specyfikacją (zakres, skuteczność, dane techniczne)
+- **Katalog środków przeciwdziałania** (COUNTERMEASURE_DB): 6 systemów (PILICA+, ZRN-01 WRE, RADAR OBSERWACJI, PPZR PIORUN, ZU-23-2, N/D — SYSTEM OBRONNY)
+  - Klikalne karty → modal z pełną specyfikacją (zakres, skuteczność, opis, dane techniczne)
 - Canvas z: ambient/directional/point lights, ContactShadows, Environment preset "city"
 - Preload wszystkich modeli na starcie (`useGLTF.preload`)
 - Dekoracje: narożniki cyan, HUD overlay z danymi modelu, grid overlay
@@ -292,10 +318,14 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 - `selectedNode`, `selectedSystem` — zaznaczony obiekt (ObjectDetailCard)
 - `mapLayers` — 7 toggle'ów warstw (baseMap, nodes, relations, domes, threats, tacticalZones, hydrology)
 - `coolingSecondsLeft`, `waterSecondsLeft` — timery kaskadowe
+- `isRelocationDragging` — czy trwa przeciąganie systemu po mapie
+- `relocationConfirmation` — dane potwierdzenia marszu (sysId, lat, lon, distance, seconds, realTime)
 
 ### Callbacki
 - `addLog(text, type)` — dodaje wpis z timestampem + odtwarza dźwięk
-- `spawnThreat(type, targetId)` — tworzy nowe zagrożenie (start position losowa)
+- `calculateDistanceKm(lat1, lon1, lat2, lon2)` — helper odległości (Haversine)
+- `formatRealTime(distanceKm, type)` — formatuje czas marszu dla demo
+- `spawnThreat(type, targetId)` — tworzy nowe zagrożenie (start position od wschodu)
 - `launchScenario(index)` — 4 predefiniowane scenariusze
 - `activatePlaybook(id, name)` — uruchamia procedurę (SIREN/ALERT_SMS/BACKUP_GEN)
 - `handleReset()` — resetuje wszystko do stanu początkowego
@@ -307,6 +337,8 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 - `handleResetWater()` — reset pomp (OBJ_03)
 - `handleRemoveSystem(sysId)` — demontaż systemu obronnego
 - `handleToggleLayer(key)` — toggle warstwy mapy
+- `handleConfirmRelocationPosition(sysId, lat, lon)` — przygotowuje potwierdzenie marszu
+- `handleRelocateSystem(sysId, lat, lon, seconds)` — rozpoczyna relokację
 
 ### useEffect'y
 1. Ładowanie basemap z localStorage
@@ -318,10 +350,11 @@ Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
 7. Zapis relations do localStorage
 8. Sync simStateRef (dla Cesium → unikanie closure stale values)
 9. Zegar (1s interwał)
-10. Resize Cesium viewer przy toggle schema
+10. Relocation countdown tick (1s interwał dla systemów z status RELOCATING)
+11. Resize Cesium viewer przy toggle schema
 
-### symStateRef
-- `MutableRefObject<SimState>` — zawsze aktualny snapshot stanu dla `useCesiumViewer` (przekracza problem zamknięcia w closure)
+### simStateRef
+- `MutableRefObject<SimState>` — zawsze aktualny snapshot stanu dla `useCesiumViewer`
 
 ---
 
@@ -336,12 +369,14 @@ Brak API routes, dynamic routes, nested layouts.
 
 ## Interakcje klawiszowo-myszowe
 
-- **Mouse move** na Cesium canvas: throttled (80ms) → aktualizacja HUD z GPS/alt/az
+- **Mouse move** na Cesium canvas: throttled (80ms) → aktualizacja HUD z GPS/alt/az + pozycja ghost relokacji
 - **Left click** na Cesium canvas:
-  - Bez wybranej broni: entity picking (node/system selection)
+  - Tryb relokacji: wywołuje `onConfirmRelocationPosition`
+  - Bez wybranej broni: entity picking (node/system selection) z drillPick
   - Z wybraną bronią: deploy systemu w kliknięte miejsce
 - **Drag** na ObjectDetailCard: przesuwanie panelu
 - **Double click** na ObjectDetailCard: reset pozycji do domyślnej
+- **ESC** na DefconOverlay: zamyka overlay
 
 ---
 
@@ -356,18 +391,21 @@ Zdefiniowane w `globals.css` przez CSS custom properties:
 | `--border-panel` | #cbd5e1 | #1e293b |
 | `--text-primary` | #0f172a | #e2e8f0 |
 | `--neon-cyan` | #0891b2 | #06b6d4 |
+| `--text-secondary` | #334155 | #94a3b8 |
+| `--text-muted` | #64748b | #64748b |
+| `--bg-button` | #f1f5f9 | #0f172a |
+| `--bg-button-hover` | #e2e8f0 | #1e293b |
+| `--grid-color` | rgba(15,23,42,0.04) | rgba(148,163,184,0.08) |
 
-Klasy pomocnicze: `theme-bg-app`, `theme-bg-panel`, `theme-border`, `theme-text-primary`, `theme-neon-text`, `theme-neon-border`, itd.
-Transition 300ms na wszystkich właściwościach.
+Klasy pomocnicze: `theme-bg-app`, `theme-bg-panel`, `theme-border`, `theme-text-primary`, `theme-text-secondary`, `theme-text-muted`, `theme-neon-text`, `theme-neon-border`, `theme-neon-bg`, `theme-bg-button`, `theme-bg-panel-hover`, `theme-input`. Transition 300ms na właściwościach.
 
 ### clip-chamfer
 - `clip-path` wielokątny (8-punktowy) → ścięte rogi militarny styl
 - `::before` → border (1 warstwa)
 - `::after` → tło panelu z backdrop-filter (1 warstwa)
-- Działa jak border-radius ale z militarnym wyglądem
 
 ### Fonty
-- Rajdhani: nagłówki, etykiety (sans-serif, techniczny)
+- Rajdhani: nagłówki, etykiety
 - Share Tech Mono: dane telemetryczne, monospace
 - JetBrains Mono: główny font body
 
@@ -410,6 +448,24 @@ OBJ_04 (GPZ Maziarnia) zniszczony
 
 ---
 
+## Relokacja systemów obronnych
+
+Systemy obronne można przemieszczać dwoma sposobami:
+
+1. **Przeciąganie po mapie** (drag):
+   - Kliknij PRZEMIEŚĆ w ObjectDetailCard → pojawia się ghost systemu podążający za kursorem
+   - Kliknij w nowe miejsce → pojawia się modal z potwierdzeniem (dystans, czas marszu)
+   - Zatwierdź → system przechodzi w status RELOCATING na 5s (demo) → wraca do OPERATIONAL na nowej pozycji
+   - W trakcie relokacji system jest nieaktywny (nie zwalcza zagrożeń)
+
+2. **Ręczne wpisywanie GPS** (w ObjectDetailCard):
+   - Wpisz target lat/lon → automatyczna estymacja czasu marszu
+   - Zatwierdź → ten sam mechanizm RELOCATING
+
+Czas marszu w demo skrócono do 5s niezależnie od dystansu.
+
+---
+
 ## Uruchamianie
 
 ```bash
@@ -440,3 +496,6 @@ npm run lint    # eslint
 - Wszystkie interfejsy w jednym pliku `types/index.ts`
 - Brak plików CSS modules — wszystkie style w `globals.css` + Tailwind utility classes
 - `three` jest zainstalowane ale nie importowane bezpośrednio w żadnym pliku źródłowym (dependency fiber/drei)
+- Entity picking na Cesium używa `drillPick` do przebijania przez przezroczyste kopuły
+- `app/utils/` istnieje ale jest pusty
+- `backend/` w katalogu nadrzędnym jest pusty

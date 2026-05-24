@@ -33,6 +33,7 @@ interface UseCesiumViewerOptions {
   nodes: CriticalNode[];
   relations: NodeRelation[];
   baseMapType?: "standard" | "satellite" | "topo";
+  onConfirmRelocationPosition?: (sysId: string, lat: number, lon: number) => void;
 }
 
 export function useCesiumViewer({
@@ -52,15 +53,22 @@ export function useCesiumViewer({
   mapLayers,
   nodes,
   relations,
-  baseMapType = "standard"
+  baseMapType = "standard",
+  onConfirmRelocationPosition
 }: UseCesiumViewerOptions) {
   const viewerRef = useRef<any>(null);
   const nodeEntitiesRef = useRef<{ [id: string]: any }>({});
   const domeEntitiesRef = useRef<{ [id: string]: any[] }>({});
   const threatEntitiesRef = useRef<{ [id: string]: any }>({});
   const laserLinesRef = useRef<any>(null);
+  const relocationDragStateRef = useRef<{ active: boolean; sysId: string } | null>(null);
   const [isCesiumLoaded, setIsCesiumLoaded] = useState(false);
   const [isZoomedOut, setIsZoomedOut] = useState(false);
+  const onConfirmRelocationPositionRef = useRef(onConfirmRelocationPosition);
+
+  useEffect(() => {
+    onConfirmRelocationPositionRef.current = onConfirmRelocationPosition;
+  }, [onConfirmRelocationPosition]);
   const clusterEntityRef = useRef<any>(null);
 
   // Layer groups refs to easily toggle visibility
@@ -138,6 +146,115 @@ export function useCesiumViewer({
       delete domeEntitiesRef.current[sysId];
     }
   }, []);
+
+  const cancelRelocationDrag = useCallback(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    relocationDragStateRef.current = null;
+
+    const ids = ["sys_reloc_ghost_model", "sys_reloc_ghost_dome", "sys_reloc_ghost_label"];
+    ids.forEach(id => {
+      const ent = viewer.entities.getById(id);
+      if (ent) viewer.entities.remove(ent);
+    });
+  }, []);
+
+  const startRelocationDrag = useCallback((sysId: string) => {
+    const viewer = viewerRef.current;
+    const Cesium = (window as any).Cesium;
+    if (!viewer || !Cesium) return;
+
+    // Clear any previous ghost
+    cancelRelocationDrag();
+
+    const sys = simStateRef.current.deployedSystems.find((s: DeployedSystem) => s.id === sysId);
+    if (!sys) return;
+
+    relocationDragStateRef.current = {
+      active: true,
+      sysId
+    };
+
+    // Create the ghost label
+    viewer.entities.add({
+      id: "sys_reloc_ghost_label",
+      position: Cesium.Cartesian3.fromDegrees(sys.lon, sys.lat, 120),
+      label: {
+        text: "WYZNACZ NOWĄ POZYCJĘ BATERII\n[RUCH KURSOREM]",
+        font: "bold 24px 'JetBrains Mono', sans-serif",
+        fillColor: Cesium.Color.fromCssColorString("#cbd5e1"),
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 4,
+        scale: 0.35,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      }
+    });
+
+    // Create the ghost dome (dotted gray grid)
+    viewer.entities.add({
+      id: "sys_reloc_ghost_dome",
+      position: Cesium.Cartesian3.fromDegrees(sys.lon, sys.lat, 0),
+      ellipsoid: {
+        radii: new Cesium.Cartesian3(sys.radius, sys.radius, sys.radius),
+        material: new Cesium.GridMaterialProperty({
+          color: Cesium.Color.fromCssColorString("#94a3b8").withAlpha(0.6),
+          cellAlpha: 0.02,
+          lineCount: new Cesium.Cartesian2(8, 8),
+          thickness: new Cesium.Cartesian2(1.5, 1.5)
+        }),
+        outline: false,
+        minimumCone: 0,
+        maximumCone: Cesium.Math.PI_OVER_TWO
+      }
+    });
+
+    // Create the ghost 3D model (grayed-out silhouetted)
+    if (sys.type === "PATRIOT") {
+      viewer.entities.add({
+        id: "sys_reloc_ghost_model",
+        position: Cesium.Cartesian3.fromDegrees(sys.lon, sys.lat, 0),
+        model: {
+          uri: "/3d_models/patriot.glb",
+          scale: 25,
+          minimumPixelSize: 64,
+          maximumScale: 50,
+          color: Cesium.Color.fromCssColorString("#94a3b8").withAlpha(0.6),
+          silhouetteColor: Cesium.Color.fromCssColorString("#cbd5e1"),
+          silhouetteSize: 1.0,
+          colorBlendMode: Cesium.ColorBlendMode.MIX,
+          colorBlendAmount: 0.8
+        }
+      });
+    } else if (sys.type === "PILICA") {
+      viewer.entities.add({
+        id: "sys_reloc_ghost_model",
+        position: Cesium.Cartesian3.fromDegrees(sys.lon, sys.lat, 0),
+        model: {
+          uri: "/3d_models/pilica.glb",
+          scale: 30,
+          minimumPixelSize: 64,
+          color: Cesium.Color.fromCssColorString("#94a3b8").withAlpha(0.6),
+          silhouetteColor: Cesium.Color.fromCssColorString("#cbd5e1"),
+          silhouetteSize: 1.0,
+          colorBlendMode: Cesium.ColorBlendMode.MIX,
+          colorBlendAmount: 0.8
+        }
+      });
+    } else {
+      // Default cube tower for Radar or WRE
+      viewer.entities.add({
+        id: "sys_reloc_ghost_model",
+        position: Cesium.Cartesian3.fromDegrees(sys.lon, sys.lat, 25),
+        box: {
+          dimensions: new Cesium.Cartesian3(30, 30, 50),
+          material: Cesium.Color.fromCssColorString("#94a3b8").withAlpha(0.4)
+        }
+      });
+    }
+  }, [cancelRelocationDrag]);
 
   const drawDeployedSystem = useCallback((sys: DeployedSystem) => {
     const viewer = viewerRef.current;
@@ -436,58 +553,113 @@ export function useCesiumViewer({
           alt: cameraHeight,
           az: Math.round(Cesium.Math.toDegrees(viewer.camera.heading))
         });
+
+        // Update ghost position if active
+        if (relocationDragStateRef.current && relocationDragStateRef.current.active) {
+          const ghostModel = viewer.entities.getById("sys_reloc_ghost_model");
+          if (ghostModel) {
+            ghostModel.position = Cesium.Cartesian3.fromDegrees(lon, lat, ghostModel.box ? 25 : 0);
+          }
+          const ghostDome = viewer.entities.getById("sys_reloc_ghost_dome");
+          if (ghostDome) {
+            ghostDome.position = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+          }
+          const ghostLabel = viewer.entities.getById("sys_reloc_ghost_label");
+          if (ghostLabel) {
+            ghostLabel.position = Cesium.Cartesian3.fromDegrees(lon, lat, 120);
+            ghostLabel.label.text = `PRZEMIEŚĆ BATERIĘ TU:\n[${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E]\n[KLIKNIJ ABY ZATWIERDZIĆ]`;
+          }
+        }
       }
     }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
     handler.setInputAction((click: any) => {
+      // 1. Check relocation drag mode
+      if (relocationDragStateRef.current && relocationDragStateRef.current.active) {
+        const cartesian = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+        if (cartesian) {
+          const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+          const lon = Cesium.Math.toDegrees(cartographic.longitude);
+          const lat = Cesium.Math.toDegrees(cartographic.latitude);
+          
+          if (onConfirmRelocationPositionRef.current) {
+            onConfirmRelocationPositionRef.current(relocationDragStateRef.current.sysId, lat, lon);
+          }
+        }
+        return;
+      }
+
+      // 2. Normal weapon placement / entity picking mode
       const activeWeapon = simStateRef.current.selectedWeapon;
       
       if (!activeWeapon) {
-        // Entity picking mode
-        const pickedObject = viewer.scene.pick(click.position);
-        if (Cesium.defined(pickedObject) && pickedObject.id) {
-          const entityId = pickedObject.id.id;
-
-          // Check tactical cluster indicator click
-          if (entityId === "tactical_cluster_stalowa_wola") {
-            onAddLog("DOWÓDZTWO: Skupiono widok na zgrupowaniu obiektów Stalowa Wola", "info");
-            viewer.camera.flyTo({
-              destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat - 0.018, 4500),
-              orientation: {
-                heading: Cesium.Math.toRadians(15.0),
-                pitch: Cesium.Math.toRadians(-38.0),
-                roll: 0.0
+        // Entity picking mode with drillPick to pierce through transparent domes!
+        const pickedObjects = viewer.scene.drillPick(click.position);
+        if (pickedObjects && pickedObjects.length > 0) {
+          // Look for system/node entities in the picked primitives
+          let resolvedEntity: any = null;
+          for (let i = 0; i < pickedObjects.length; i++) {
+            const obj = pickedObjects[i];
+            if (Cesium.defined(obj) && obj.id) {
+              const entId = obj.id.id || obj.id;
+              if (typeof entId === "string" && (entId.toLowerCase().startsWith("sys_") || entId.startsWith("OBJ_"))) {
+                resolvedEntity = obj.id;
+                // Prefer models/beacons/points over the giant domes if multiple are picked!
+                if (entId.endsWith("_model") || entId.endsWith("_tower") || entId.endsWith("_beacon")) {
+                  break; // Found our prime 3D candidate!
+                }
               }
-            });
-            return;
-          }
-          
-          // Check nodes
-          const matchedNode = simStateRef.current.nodes.find((n: CriticalNode) => n.id === entityId);
-          if (matchedNode) {
-            if (setSelectedNode) setSelectedNode(matchedNode);
-            if (setSelectedSystem) setSelectedSystem(null);
-            onAddLog(`DOWÓDZTWO: Wybrano węzeł strategiczny: ${matchedNode.name}`, "info");
-            flyToNode(matchedNode.lat, matchedNode.lon, matchedNode.name);
-            return;
-          }
-
-          // Strip suffixes for deployed systems (like _model, _tower, _beacon, _label)
-          let baseId = entityId;
-          if (entityId.startsWith("sys_")) {
-            const parts = entityId.split("_");
-            if (parts.length > 2) {
-              baseId = `${parts[0]}_${parts[1]}`;
             }
           }
 
-          // Check deployed systems
-          const matchedSystem = simStateRef.current.deployedSystems.find((s: DeployedSystem) => s.id === baseId);
-          if (matchedSystem) {
-            if (setSelectedSystem) setSelectedSystem(matchedSystem);
+          if (resolvedEntity) {
+            const entityId = resolvedEntity.id;
+
+            // Check tactical cluster indicator click
+            if (entityId === "tactical_cluster_stalowa_wola") {
+              onAddLog("DOWÓDZTWO: Skupiono widok na zgrupowaniu obiektów Stalowa Wola", "info");
+              viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat - 0.018, 4500),
+                orientation: {
+                  heading: Cesium.Math.toRadians(15.0),
+                  pitch: Cesium.Math.toRadians(-38.0),
+                  roll: 0.0
+                }
+              });
+              return;
+            }
+            
+            // Check nodes
+            const matchedNode = simStateRef.current.nodes.find((n: CriticalNode) => n.id === entityId);
+            if (matchedNode) {
+              if (setSelectedNode) setSelectedNode(matchedNode);
+              if (setSelectedSystem) setSelectedSystem(null);
+              onAddLog(`DOWÓDZTWO: Wybrano węzeł strategiczny: ${matchedNode.name}`, "info");
+              flyToNode(matchedNode.lat, matchedNode.lon, matchedNode.name);
+              return;
+            }
+
+            // Strip suffixes for deployed systems (like _model, _tower, _beacon, _label)
+            let baseId = entityId;
+             if (entityId.toLowerCase().startsWith("sys_")) {
+              const parts = entityId.split("_");
+              if (parts.length > 2) {
+                baseId = `${parts[0]}_${parts[1]}`;
+              }
+            }
+
+            // Check deployed systems
+            const matchedSystem = simStateRef.current.deployedSystems.find((s: DeployedSystem) => s.id === baseId);
+            if (matchedSystem) {
+              if (setSelectedSystem) setSelectedSystem(matchedSystem);
+              if (setSelectedNode) setSelectedNode(null);
+              onAddLog(`DOWÓDZTWO: Wybrano aktywne pokrycie tarczy: ${matchedSystem.name}`, "info");
+              return;
+            }
+          } else {
+            // Clear selection on empty space click
             if (setSelectedNode) setSelectedNode(null);
-            onAddLog(`DOWÓDZTWO: Wybrano aktywne pokrycie tarczy: ${matchedSystem.name}`, "info");
-            return;
+            if (setSelectedSystem) setSelectedSystem(null);
           }
         } else {
           // Clear selection on empty space click
@@ -1276,6 +1448,8 @@ export function useCesiumViewer({
     flyToNode,
     resetViewer,
     removeDeployedSystem,
-    drawDeployedSystem
+    drawDeployedSystem,
+    startRelocationDrag,
+    cancelRelocationDrag
   };
 }
