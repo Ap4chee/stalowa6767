@@ -26,7 +26,8 @@ export function useDefcon(
 
     if (targetDefcon !== defcon) {
       setDefcon(targetDefcon);
-      addLog(`ZMIANA POZIOMU ZAGROŻENIA: STOPIEŃ ${targetDefcon}`, targetDefcon <= 2 ? "error" : targetDefcon === 3 ? "warning" : "info");
+      const visibleThreatLevel = 6 - targetDefcon;
+      addLog(`ZMIANA POZIOMU ZAGROŻENIA: STOPIEŃ ${visibleThreatLevel}`, targetDefcon <= 2 ? "error" : targetDefcon === 3 ? "warning" : "info");
     }
   }, [threats, nodes, deployedSystemsLength, defcon, setDefcon, addLog]);
 }

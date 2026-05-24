@@ -65,20 +65,25 @@ export function Header({
           <Crosshair className="w-3.5 h-3.5" />
           <span>ROZPOZNANIE 3D</span>
         </button>
-        <div className={`flex items-center gap-2 px-3 py-1 border transition-all ${
-          defcon === 1
-            ? "border-red-600 bg-red-500/10 text-red-500 animate-pulse font-bold"
-            : defcon === 2
-            ? "border-orange-500 bg-orange-500/10 text-orange-500 animate-pulse"
-            : defcon === 3
-            ? "border-amber-400 bg-amber-500/10 text-amber-500"
-            : "border-emerald-500 bg-emerald-500/10 text-emerald-500"
-        }`}>
-          <span className="text-[10px] font-bold tracking-widest">ZAGROŻENIE {defcon}</span>
-          <span className={`w-2 h-2 rounded-full ${
-            defcon === 1 ? "bg-red-500" : defcon === 2 ? "bg-orange-500" : defcon === 3 ? "bg-amber-400" : "bg-emerald-500"
-          }`} />
-        </div>
+        {(() => {
+          const threatLevel = 6 - defcon;
+          return (
+            <div className={`flex items-center gap-2 px-3 py-1 border transition-all ${
+              threatLevel === 5
+                ? "border-red-600 bg-red-500/10 text-red-500 animate-pulse font-bold"
+                : threatLevel === 4
+                ? "border-orange-500 bg-orange-500/10 text-orange-500 animate-pulse"
+                : threatLevel === 3
+                ? "border-amber-400 bg-amber-500/10 text-amber-500"
+                : "border-emerald-500 bg-emerald-500/10 text-emerald-500"
+            }`}>
+              <span className="text-[10px] font-bold tracking-widest">ZAGROŻENIE {threatLevel}</span>
+              <span className={`w-2 h-2 rounded-full ${
+                threatLevel === 5 ? "bg-red-500" : threatLevel === 4 ? "bg-orange-500" : threatLevel === 3 ? "bg-amber-400" : "bg-emerald-500"
+              }`} />
+            </div>
+          );
+        })()}
         <div className="text-[11px] theme-text-secondary tabular-nums border-l theme-border pl-4 h-12 flex items-center">
           {clockTime || "--:--:--"} UTC
         </div>
