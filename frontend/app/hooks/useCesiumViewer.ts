@@ -627,10 +627,10 @@ export function useCesiumViewer({
 
           if (distance <= sys.radius) {
             const pathConfig = THREAT_TYPES[threat.type];
-            const activeMatch = sys.type === "PILICA" || (sys.type === "WRE" && !pathConfig.immuneToWRE);
+            const activeMatch = sys.type === "PILICA" || sys.type === "PATRIOT" || (sys.type === "WRE" && !pathConfig.immuneToWRE);
 
             if (activeMatch && laserLinesRef.current && typeof laserLinesRef.current.add === "function") {
-              const laserColor = sys.type === "PILICA" ? "#ff4d4d" : "#3b82f6";
+              const laserColor = sys.type === "PILICA" ? "#ff4d4d" : sys.type === "PATRIOT" ? "#a855f7" : "#3b82f6";
               // Neon Outer Glow
               laserLinesRef.current.add({
                 positions: [sysPos, threatPos],
@@ -644,12 +644,12 @@ export function useCesiumViewer({
                 color: Cesium.Color.WHITE
               });
 
-              const dmg = sys.type === "PILICA" ? 0.9 : 2.5;
+              const dmg = sys.type === "PILICA" ? 0.9 : sys.type === "PATRIOT" ? 1.8 : 2.5;
               threat.health -= dmg * speed;
 
               if (threat.health <= 0) {
                 interceptedThisFrame = true;
-                threat.status = sys.type === "PILICA" ? "INTERCEPTED" : "JAMMED";
+                threat.status = sys.type === "WRE" ? "JAMMED" : "INTERCEPTED";
 
                 viewer.entities.remove(threatEntity);
                 delete threatEntitiesRef.current[threat.id];
@@ -658,6 +658,8 @@ export function useCesiumViewer({
 
                 if (sys.type === "PILICA") {
                   onAddLog(`KINETYCZNE ZESTRZELEŃIE: PSR-A PILICA zneutralizował rakietami cel ${threat.name}!`, "combat");
+                } else if (sys.type === "PATRIOT") {
+                  onAddLog(`RAKIETOWE PRZECHWYCENIE: MIM-104 PATRIOT PAC-3 zniszczył cel ${threat.name} na dystansie ${Math.round(distance)}m!`, "combat");
                 } else {
                   onAddLog(`ZAKŁÓCENIE WRE: Jammer zakłócił GPS cywilnego drona ${threat.name}. Spadek na ziemię!`, "combat");
                 }

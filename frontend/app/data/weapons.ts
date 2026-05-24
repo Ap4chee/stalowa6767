@@ -27,5 +27,14 @@ export const WEAPONS: WeaponSystem[] = [
     colorHex: "#22c55e",
     description: "Radar dopplerowski wczesnego wykrywania celów o małej sygnaturze LSS.",
     threatsCovered: ["DRONE", "SHAHED", "MISSILE"]
+  },
+  {
+    type: "PATRIOT",
+    name: "MIM-104 PATRIOT PAC-3",
+    range: 40000,
+    color: "#a855f7",
+    colorHex: "#a855f7",
+    description: "Wielokanałowy system rakietowy dalekiego zasięgu. Przechwytuje rakiety balistyczne i manewrujące na pułapie do 24km.",
+    threatsCovered: ["SHAHED", "MISSILE"]
   }
 ];

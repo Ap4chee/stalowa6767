@@ -36,6 +36,21 @@ const THREAT_CATALOG = [
     description: "Irańska amunicja krążąca eksportowana do Rosji (Geran-2). Silnik tłokowy, delta, nawigacja INS/GNSS. Odporny na podstawowe systemy WRE. Wymaga kinetycznego przechwycenia.",
     countermeasures: ["PILICA+", "PPZR PIORUN", "ZU-23-2"],
     cameraDistance: 6,
+  },
+  {
+    id: "patriot_pac3",
+    name: "MIM-104 Patriot PAC-3",
+    designation: "MIM-104F PATRIOT PAC-3 MSE",
+    classification: "SYSTEM RAKIETOWY OPL",
+    modelPath: "/3d_models/patriot.glb",
+    speed: "Mach 5+ (pocisk)",
+    range: "40-160 km",
+    altitude: "do 24 000m",
+    payload: "Głowica hit-to-kill",
+    threat: "SOJUSZNICZY",
+    description: "Amerykański system obrony przeciwlotniczej i przeciwrakietowej dalekiego zasięgu. Radar AN/MPQ-65 zapewnia śledzenie 100+ celów jednocześnie. Pocisk PAC-3 MSE wykorzystuje technologię kinetycznego przechwycenia (hit-to-kill).",
+    countermeasures: ["N/D — SYSTEM OBRONNY"],
+    cameraDistance: 8,
   }
 ];
 
@@ -100,7 +115,7 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
             <div className="flex items-center gap-2">
               <Crosshair className="w-5 h-5 theme-neon-text animate-pulse" />
               <span className="font-rajdhani font-extrabold tracking-widest text-[14px] theme-neon-text">
-                ROZPOZNANIE ZAGROŻEŃ
+                ROZPOZNANIE 3D
               </span>
             </div>
             <span className="text-[9px] theme-bg-app border theme-border px-2 py-0.5 theme-text-secondary font-mono">
@@ -243,10 +258,12 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
 
               {/* Threat level */}
               <div>
-                <div className="text-[8px] font-bold font-rajdhani tracking-widest theme-text-muted mb-1">POZIOM ZAGROŻENIA</div>
+                <div className="text-[8px] font-bold font-rajdhani tracking-widest theme-text-muted mb-1">KLASYFIKACJA</div>
                 <span className={`text-[11px] font-bold font-rajdhani tracking-widest px-2.5 py-1 border rounded ${
                   threat.threat === "KRYTYCZNY" 
                     ? "text-red-500 border-red-500/40 bg-red-500/10 animate-pulse" 
+                    : threat.threat === "SOJUSZNICZY"
+                    ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
                     : "text-amber-500 border-amber-500/40 bg-amber-500/10"
                 }`}>
                   {threat.threat}

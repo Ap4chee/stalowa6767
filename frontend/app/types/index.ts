@@ -12,7 +12,7 @@ export interface CriticalNode {
 }
 
 export interface WeaponSystem {
-  type: "PILICA" | "WRE" | "RADAR";
+  type: "PILICA" | "WRE" | "RADAR" | "PATRIOT";
   name: string;
   range: number;
   color: string;
@@ -23,7 +23,7 @@ export interface WeaponSystem {
 
 export interface DeployedSystem {
   id: string;
-  type: "PILICA" | "WRE" | "RADAR";
+  type: "PILICA" | "WRE" | "RADAR" | "PATRIOT";
   name: string;
   lat: number;
   lon: number;
@@ -69,7 +69,7 @@ export interface HoveredCoords {
   az: number;
 }
 
-export type WeaponType = "PILICA" | "WRE" | "RADAR";
+export type WeaponType = "PILICA" | "WRE" | "RADAR" | "PATRIOT";
 export type ThreatTypeName = "DRONE" | "SHAHED" | "MISSILE";
 export type NodeStatus = "OPERATIONAL" | "DEGRADED" | "DESTROYED";
 export type LogType = "info" | "success" | "warning" | "error" | "combat";
