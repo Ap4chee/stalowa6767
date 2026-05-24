@@ -230,53 +230,7 @@ export function useCesiumViewer({
     });
     hydrologyEntitiesGroupRef.current.push(riverLabel);
 
-    // Tactical Zone bounding rectangle
-    const zoneRect = viewer.entities.add({
-      rectangle: {
-        coordinates: Cesium.Rectangle.fromDegrees(22.01, 50.52, 22.09, 50.60),
-        material: Cesium.Color.CYAN.withAlpha(0.02),
-        outline: true,
-        outlineColor: Cesium.Color.CYAN.withAlpha(0.25),
-        outlineWidth: 1.5,
-        height: 0
-      },
-      show: mapLayers.tacticalZones
-    });
-    tacticalZoneEntitiesGroupRef.current.push(zoneRect);
-
-    // NW label
-    const zoneLabelNW = viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(22.01, 50.60, 30),
-      label: {
-        text: "ZONA TAKTYCZNA STW // NW",
-        font: "bold 28px JetBrains Mono, monospace",
-        fillColor: Cesium.Color.fromCssColorString("#0891b2"),
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 4,
-        scale: 0.3,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      },
-      show: mapLayers.tacticalZones
-    });
-    tacticalZoneEntitiesGroupRef.current.push(zoneLabelNW);
-
-    // SE label
-    const zoneLabelSE = viewer.entities.add({
-      position: Cesium.Cartesian3.fromDegrees(22.09, 50.52, 30),
-      label: {
-        text: "ZONA TAKTYCZNA STW // SE",
-        font: "bold 28px JetBrains Mono, monospace",
-        fillColor: Cesium.Color.fromCssColorString("#0891b2"),
-        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 4,
-        scale: 0.3,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
-      },
-      show: mapLayers.tacticalZones
-    });
-    tacticalZoneEntitiesGroupRef.current.push(zoneLabelSE);
+    // Tactical Zone bounding rectangle was removed as requested
 
     const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
     let lastUpdate = 0;
@@ -342,10 +296,7 @@ export function useCesiumViewer({
         const lon = Cesium.Math.toDegrees(cartographic.longitude);
         const lat = Cesium.Math.toDegrees(cartographic.latitude);
 
-        if (lat < 50.51 || lat > 50.61 || lon < 22.01 || lon > 22.09) {
-          onAddLog("DOWÓDZTWO: Lokacja poza dozwoloną strefą obronną miasta Stalowa Wola.", "error");
-          return;
-        }
+
 
         const weapon = WEAPONS.find(w => w.type === activeWeapon);
         if (!weapon) return;
