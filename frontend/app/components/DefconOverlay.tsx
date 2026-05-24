@@ -49,7 +49,7 @@ export function DefconOverlay({ defcon }: DefconOverlayProps) {
   const isCritical = defcon <= 3;
 
   return (
-    <div className="fixed inset-0 z-[50] pointer-events-none select-none flex justify-center">
+    <div className="fixed inset-0 z-[50] pointer-events-none select-none flex justify-center items-start">
       {/* Subtly pulsed screen-edge vignette (pure visual overlay, no clicks blocked) */}
       <div 
         className={`absolute inset-0 transition-opacity duration-1000 pointer-events-none ${
