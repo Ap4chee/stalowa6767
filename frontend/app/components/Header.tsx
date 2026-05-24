@@ -74,7 +74,7 @@ export function Header({
             ? "border-amber-400 bg-amber-500/10 text-amber-500"
             : "border-emerald-500 bg-emerald-500/10 text-emerald-500"
         }`}>
-          <span className="text-[10px] font-bold tracking-widest">DEFCON {defcon}</span>
+          <span className="text-[10px] font-bold tracking-widest">ZAGROŻENIE {defcon}</span>
           <span className={`w-2 h-2 rounded-full ${
             defcon === 1 ? "bg-red-500" : defcon === 2 ? "bg-orange-500" : defcon === 3 ? "bg-amber-400" : "bg-emerald-500"
           }`} />
