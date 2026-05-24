@@ -513,8 +513,8 @@ export function useCesiumViewer({
       activeThreats.forEach((threat) => {
         const target = currentNodes.find(n => n.id === threat.targetId);
         if (!target) return;
-
-        threat.progress += 0.003 * speed;
+        const baseSpeed = threat.type === "DRONE" ? 0.0006 : threat.type === "SHAHED" ? 0.001 : 0.002;
+        threat.progress += baseSpeed * speed;
 
         if (threat.pathType === "RIVER") {
           const routeProgress = Math.min(1.0, threat.progress * 1.15);

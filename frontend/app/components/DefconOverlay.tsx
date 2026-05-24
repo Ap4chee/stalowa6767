@@ -16,6 +16,12 @@ export function DefconOverlay({ defcon }: DefconOverlayProps) {
     if (defcon !== prevDefcon) {
       setVisible(true);
       setPrevDefcon(defcon);
+      
+      // Auto-hide after 6 seconds so it doesn't clog the dashboard
+      const timer = setTimeout(() => {
+        setVisible(false);
+      }, 6000);
+      return () => clearTimeout(timer);
     }
   }, [defcon, prevDefcon]);
 
@@ -33,75 +39,59 @@ export function DefconOverlay({ defcon }: DefconOverlayProps) {
   if (!visible) return null;
 
   const defconNames: Record<number, string> = {
-    5: "5 - FADE OUT (STAN POKOJU / MONITOROWANIE)",
-    4: "4 - DOUBLE TAKE (PODWYŻSZONA CZUJNOŚĆ SZTABU)",
-    3: "3 - ROUND HOUSE (GOTOWOŚĆ BOJOWA / MOBILIZACJA)",
-    2: "2 - FAST PACE (BEZPOŚREDNIE ZAGROŻENIE ATAKIEM)",
-    1: "1 - COCKED PISTOL (STAN WOJNY / ODPARCIE NALOTU)",
+    5: "STAN POKOJU / NORMALNY MONITORING OCHRONNY",
+    4: "PODWYŻSZONA CZUJNOŚĆ SZTABU I SYSTEMÓW OPL",
+    3: "GOTOWOŚĆ BOJOWA / PEŁNA MOBILIZACJA WĘZŁÓW",
+    2: "BEZPOŚREDNIE ZAGROŻENIE ATAKIEM POWIETRZNYM",
+    1: "STAN WOJNY / AKTYWNE ODPARCIE NALOTU saturacyjnego",
   };
 
   const isCritical = defcon <= 3;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      {/* High-intensity vignette background overlay */}
+    <div className="fixed inset-0 z-[50] pointer-events-none select-none flex flex-col items-center">
+      {/* Subtly pulsed screen-edge vignette (pure visual overlay, no clicks blocked) */}
       <div 
-        onClick={() => setVisible(false)}
-        className={`absolute inset-0 transition-opacity duration-700 cursor-pointer ${
+        className={`absolute inset-0 transition-opacity duration-1000 pointer-events-none ${
           isCritical 
-            ? "bg-red-950/40 shadow-[inset_0_0_100px_rgba(239,68,68,0.6)] animate-pulse" 
-            : "bg-black/30 shadow-[inset_0_0_60px_rgba(245,158,11,0.35)]"
+            ? "shadow-[inset_0_0_50px_rgba(239,68,68,0.35)] animate-pulse" 
+            : "shadow-[inset_0_0_25px_rgba(245,158,11,0.15)]"
         }`} 
       />
 
-      {/* Futuristic Tactical Warning Box */}
-      <div className="relative w-[480px] theme-bg-panel border-2 border-red-500/80 p-6 clip-chamfer shadow-[0_0_40px_rgba(239,68,68,0.4)] backdrop-blur-xl flex flex-col items-center gap-4 animate-scaleUp pointer-events-auto">
-        {/* Tech Corner Accents */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-red-500" />
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-red-500" />
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-red-500" />
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-red-500" />
+      {/* Futuristic, non-blocking Top-Center Alert Ribbon (only this bar captures hover/clicks) */}
+      <div className="mt-14 w-[420px] theme-bg-panel border border-red-500/40 p-2 py-1.5 px-3.5 clip-chamfer shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-md flex items-center justify-between gap-3 animate-slideDown pointer-events-auto relative">
+        {/* Sleek tactical left bar indicator */}
+        <div className={`absolute top-0 bottom-0 left-0 w-1 ${isCritical ? "bg-red-500 animate-pulse" : "bg-amber-500"}`} />
 
-        {/* Header bar */}
-        <div className="flex items-center justify-between w-full border-b border-red-900/30 pb-2.5">
-          <div className="flex items-center gap-2 text-red-500 font-extrabold tracking-wider text-[11px] font-sharetech animate-pulse">
-            <ShieldAlert className="w-5 h-5" />
-            <span>ALARM KRYZYSOWY SZTABU C2</span>
+        {/* Warning Information display */}
+        <div className="flex items-center gap-2.5">
+          <ShieldAlert className={`w-4 h-4 ${isCritical ? "text-red-500 animate-pulse" : "text-amber-550"}`} />
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-red-500 tracking-wider font-rajdhani uppercase">
+              STATUS GOTOWOŚCI: DEFCON {defcon}
+            </span>
+            <span className="text-[7.5px] theme-text-secondary font-sharetech font-bold uppercase tracking-wide">
+              {defconNames[defcon] || `GOTOWOŚĆ POZIOM ${defcon}`}
+            </span>
           </div>
-          
+        </div>
+
+        {/* Small Action and Dismiss controls */}
+        <div className="flex items-center gap-1.5 border-l theme-border pl-2.5">
           <button
             onClick={() => setVisible(false)}
-            className="p-1 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded transition-colors cursor-pointer"
-            title="Zamknij okno"
+            className="px-1.5 py-0.5 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded transition-all cursor-pointer text-[7.5px] font-bold font-sharetech uppercase tracking-widest border border-red-500/20"
           >
-            <X className="w-4 h-4" />
+            ZATWIERDŹ
           </button>
-        </div>
-
-        {/* Warning Body */}
-        <div className="flex flex-col items-center text-center gap-2 mt-2">
-          <span className="text-[9px] theme-text-secondary tracking-widest font-mono uppercase">
-            ZMIANA POZIOMU GOTOWOŚCI TAKTYCZNEJ
-          </span>
-          <span className="text-3xl font-black text-red-500 tracking-wider font-rajdhani animate-pulse">
-            DEFCON {defcon}
-          </span>
-          <span className="text-[10px] font-bold font-sharetech theme-text-primary px-3 py-1 border border-red-500/30 bg-red-500/5 mt-1 rounded uppercase">
-            {defconNames[defcon] || `POZIOM ${defcon}`}
-          </span>
-        </div>
-
-        {/* Dismiss Controls Footer */}
-        <div className="w-full flex items-center justify-between border-t border-red-900/20 pt-4 mt-2">
-          <span className="text-[8px] theme-text-muted font-mono uppercase">
-            KLIKNIJ TŁO LUB [ESC] ABY ODRAZU SKASOWAĆ
-          </span>
           
           <button
             onClick={() => setVisible(false)}
-            className="px-4 py-1.5 border border-red-500 bg-red-500/15 text-red-400 hover:bg-red-500/25 hover:text-red-300 transition-all font-bold text-[9px] tracking-widest clip-chamfer cursor-pointer"
+            className="p-0.5 hover:bg-red-500/10 text-red-400 hover:text-red-300 rounded transition-colors cursor-pointer"
+            title="Zamknij alarm (ESC)"
           >
-            ZATWIERDŹ I ZAMKNIJ [ESC]
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
