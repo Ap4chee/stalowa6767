@@ -112,7 +112,7 @@ export function useCesiumViewer({
     const Cesium = (window as any).Cesium;
     if (!viewer || !Cesium) return;
 
-    const idsToRemove = [sysId, `${sysId}_tower`, `${sysId}_beacon`, `${sysId}_label`];
+    const idsToRemove = [sysId, `${sysId}_tower`, `${sysId}_model`, `${sysId}_beacon`, `${sysId}_label`];
     idsToRemove.forEach(id => {
       const ent = viewer.entities.getById(id);
       if (ent) viewer.entities.remove(ent);
