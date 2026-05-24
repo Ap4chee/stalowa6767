@@ -892,9 +892,9 @@ export function useCesiumViewer({
   // Toggle visibility of Hydrology (River San)
   useEffect(() => {
     hydrologyEntitiesGroupRef.current.forEach(entity => {
-      if (entity) entity.show = mapLayers.hydrology;
+      if (entity) entity.show = mapLayers.hydrology && !isZoomedOut;
     });
-  }, [mapLayers.hydrology, isCesiumLoaded]);
+  }, [mapLayers.hydrology, isZoomedOut, isCesiumLoaded]);
 
   // Toggle visibility of Tactical Zones
   useEffect(() => {
