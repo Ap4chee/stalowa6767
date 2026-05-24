@@ -1023,10 +1023,10 @@ export function useCesiumViewer({
         const ents = domeEntitiesRef.current[sys.id] as any;
         if (Array.isArray(ents)) {
           ents.forEach(ent => {
-            if (ent) ent.show = mapLayers.domes && !isZoomedOut;
+            if (ent) ent.show = mapLayers.domes;
           });
         } else if (ents) {
-          ents.show = mapLayers.domes && !isZoomedOut;
+          ents.show = mapLayers.domes;
         }
       }
     });
