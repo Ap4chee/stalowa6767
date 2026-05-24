@@ -220,7 +220,7 @@ export function useCesiumViewer({
       position: Cesium.Cartesian3.fromDegrees(22.0620, 50.5700, 50),
       label: {
         text: "RZEKA SAN",
-        font: "bold 32px Share Tech Mono, monospace",
+        font: "bold 32px 'Share Tech Mono', sans-serif",
         fillColor: Cesium.Color.fromCssColorString("#0284c7"),
         style: Cesium.LabelStyle.FILL_AND_OUTLINE,
         outlineColor: Cesium.Color.WHITE,
@@ -457,7 +457,7 @@ export function useCesiumViewer({
           position: Cesium.Cartesian3.fromDegrees(lon, lat, labelHeight),
           label: {
             text: newSys.name.toUpperCase(),
-            font: "bold 38px Share Tech Mono, monospace",
+            font: "bold 38px 'Share Tech Mono', sans-serif",
             fillColor: Cesium.Color.fromCssColorString("#0f172a"),
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             outlineColor: Cesium.Color.WHITE,
@@ -538,7 +538,7 @@ export function useCesiumViewer({
             },
             label: {
               text: threat.name.toUpperCase(),
-              font: "bold 30px Share Tech Mono, monospace",
+              font: "bold 30px 'Share Tech Mono', sans-serif",
               fillColor: Cesium.Color.fromCssColorString("#991b1b"),
               outlineColor: Cesium.Color.WHITE,
               outlineWidth: 4,
@@ -716,7 +716,7 @@ export function useCesiumViewer({
         },
         label: {
           text: node.name.toUpperCase(),
-          font: "bold 42px Share Tech Mono, monospace",
+          font: "bold 42px 'Share Tech Mono', sans-serif",
           fillColor: Cesium.Color.fromCssColorString("#0f172a"),
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           outlineColor: Cesium.Color.WHITE,
@@ -737,7 +737,7 @@ export function useCesiumViewer({
         position: Cesium.Cartesian3.fromDegrees(node.lon, node.lat, 180),
         label: {
           text: `[${node.id}] ${node.lat.toFixed(4)}°N ${node.lon.toFixed(4)}°E`,
-          font: "bold 28px JetBrains Mono, monospace",
+          font: "bold 28px 'JetBrains Mono', sans-serif",
           fillColor: Cesium.Color.fromCssColorString("#475569"),
           style: Cesium.LabelStyle.FILL_AND_OUTLINE,
           outlineColor: Cesium.Color.WHITE.withAlpha(0.95),
@@ -832,7 +832,7 @@ export function useCesiumViewer({
         },
         label: {
           text: `  ${rel.label.toUpperCase()}  `,
-          font: "bold 10px JetBrains Mono, monospace, Share Tech Mono",
+          font: "bold 10px 'Share Tech Mono', 'JetBrains Mono', Arial, sans-serif",
           fillColor: Cesium.Color.WHITE,
           style: Cesium.LabelStyle.FILL,
           showBackground: true,

@@ -47,15 +47,14 @@ export function Header({
       <div className="flex items-center gap-4 font-mono">
         <button
           onClick={onToggleSchemaMode}
-          className={`px-3 py-1 text-[10px] border flex items-center gap-1.5 font-bold tracking-widest transition-all cursor-pointer ${
-            schemaModeEnabled
-              ? "theme-neon-border bg-cyan-500/10 theme-neon-text animate-pulse"
-              : "theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-panel-hover"
-          }`}
+          className={`px-3 py-1 text-[10px] border flex items-center gap-1.5 font-bold tracking-widest transition-all cursor-pointer ${schemaModeEnabled
+            ? "theme-neon-border bg-cyan-500/10 theme-neon-text animate-pulse"
+            : "theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-panel-hover"
+            }`}
           title="Przełącz podgląd grafu powiązań sieciowych"
         >
           <Network className="w-3.5 h-3.5" />
-          <span>TRYB SCHEMATU</span>
+          <span>SCHEMAT POWIĄZAŃ</span>
         </button>
         <button
           onClick={onOpenThreatViewer}
@@ -63,39 +62,36 @@ export function Header({
           title="Otwórz podgląd 3D modeli zagrożeń"
         >
           <Crosshair className="w-3.5 h-3.5" />
-          <span>ROZPOZNANIE 3D</span>
+          <span>BAZA OBIEKTÓW 3D</span>
         </button>
         {(() => {
           const threatLevel = 6 - defcon;
           return (
-            <div className={`flex items-center gap-2 px-3 py-1 border transition-all ${
-              threatLevel === 5
-                ? "border-red-600 bg-red-500/10 text-red-500 animate-pulse font-bold"
-                : threatLevel === 4
+            <div className={`flex items-center gap-2 px-3 py-1 border transition-all ${threatLevel === 5
+              ? "border-red-600 bg-red-500/10 text-red-500 animate-pulse font-bold"
+              : threatLevel === 4
                 ? "border-orange-500 bg-orange-500/10 text-orange-500 animate-pulse"
                 : threatLevel === 3
-                ? "border-amber-400 bg-amber-500/10 text-amber-500"
-                : "border-emerald-500 bg-emerald-500/10 text-emerald-500"
-            }`}>
+                  ? "border-amber-400 bg-amber-500/10 text-amber-500"
+                  : "border-emerald-500 bg-emerald-500/10 text-emerald-500"
+              }`}>
               <span className="text-[10px] font-bold tracking-widest">ZAGROŻENIE {threatLevel}</span>
-              <span className={`w-2 h-2 rounded-full ${
-                threatLevel === 5 ? "bg-red-500" : threatLevel === 4 ? "bg-orange-500" : threatLevel === 3 ? "bg-amber-400" : "bg-emerald-500"
-              }`} />
+              <span className={`w-2 h-2 rounded-full ${threatLevel === 5 ? "bg-red-500" : threatLevel === 4 ? "bg-orange-500" : threatLevel === 3 ? "bg-amber-400" : "bg-emerald-500"
+                }`} />
             </div>
           );
         })()}
         <div className="text-[11px] theme-text-secondary tabular-nums border-l theme-border pl-4 h-12 flex items-center">
           {clockTime || "--:--:--"} UTC
         </div>
-        
+
         {/* Theme Toggle Button */}
         <button
           onClick={onToggleTheme}
-          className={`p-1.5 border transition-all flex items-center justify-center theme-bg-button hover:theme-bg-button/80 cursor-pointer ${
-            theme === "light"
-              ? "border-amber-500/60 text-amber-600 bg-amber-500/10"
-              : "border-cyan-500/60 text-cyan-400 bg-cyan-950/10"
-          }`}
+          className={`p-1.5 border transition-all flex items-center justify-center theme-bg-button hover:theme-bg-button/80 cursor-pointer ${theme === "light"
+            ? "border-amber-500/60 text-amber-600 bg-amber-500/10"
+            : "border-cyan-500/60 text-cyan-400 bg-cyan-950/10"
+            }`}
           title={theme === "light" ? "Przełącz na Tryb Ciemny" : "Przełącz na Tryb Jasny"}
         >
           {theme === "light" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -103,9 +99,8 @@ export function Header({
 
         <button
           onClick={onToggleSound}
-          className={`p-1.5 border transition-all flex items-center justify-center theme-bg-button hover:theme-bg-button/80 cursor-pointer ${
-            soundEnabled ? "theme-neon-border theme-neon-text bg-cyan-500/10" : "theme-border theme-text-muted"
-          }`}
+          className={`p-1.5 border transition-all flex items-center justify-center theme-bg-button hover:theme-bg-button/80 cursor-pointer ${soundEnabled ? "theme-neon-border theme-neon-text bg-cyan-500/10" : "theme-border theme-text-muted"
+            }`}
           title="Włącz/Wyłącz sygnały dźwiękowe"
         >
           {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}

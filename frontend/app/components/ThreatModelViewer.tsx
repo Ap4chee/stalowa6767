@@ -292,14 +292,14 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
       {/* Main container */}
       <div className="w-[95vw] max-w-[1200px] h-[85vh] max-h-[800px] theme-bg-panel border theme-border rounded-lg shadow-2xl flex flex-col overflow-hidden">
-        
+
         {/* Header bar */}
         <div className="flex items-center justify-between px-5 py-3 border-b theme-border">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Crosshair className="w-5 h-5 theme-neon-text animate-pulse" />
               <span className="font-rajdhani font-extrabold tracking-widest text-[14px] theme-neon-text">
-                ROZPOZNANIE 3D
+                BAZA OBIEKTÓW 3D
               </span>
             </div>
             <span className="text-[9px] theme-bg-app border theme-border px-2 py-0.5 theme-text-secondary font-mono">
@@ -316,7 +316,7 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
 
         {/* Content area: 3D viewport + info panel */}
         <div className="flex flex-1 min-h-0">
-          
+
           {/* Left: 3D Canvas */}
           <div className="flex-1 relative bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950/30 dark:from-slate-950 dark:via-slate-900 dark:to-cyan-950/30">
             {/* Canvas corner decorations */}
@@ -345,9 +345,8 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
               </button>
               <button
                 onClick={() => setAutoRotate(!autoRotate)}
-                className={`p-1.5 bg-black/50 border transition-all rounded cursor-pointer ${
-                  autoRotate ? "border-cyan-500 text-cyan-400 bg-cyan-500/20" : "border-cyan-500/30 text-cyan-400/50"
-                }`}
+                className={`p-1.5 bg-black/50 border transition-all rounded cursor-pointer ${autoRotate ? "border-cyan-500 text-cyan-400 bg-cyan-500/20" : "border-cyan-500/30 text-cyan-400/50"
+                  }`}
                 title="Autorotacja"
               >
                 <Eye className="w-3.5 h-3.5" />
@@ -406,7 +405,7 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
 
           {/* Right: Info panel */}
           <div className="w-[340px] border-l theme-border flex flex-col theme-bg-panel relative">
-            
+
             {/* Countermeasure detail modal overlay */}
             {selectedCM && (
               <CountermeasureModal cmKey={selectedCM} onClose={() => setSelectedCM(null)} />
@@ -438,7 +437,7 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
 
             {/* Threat info body */}
             <div className="flex-1 overflow-y-auto terminal-scroll p-4 space-y-4">
-              
+
               {/* Designation */}
               <div>
                 <div className="text-[8px] font-bold font-rajdhani tracking-widest theme-text-muted mb-1">OZNACZENIE NATO</div>
@@ -448,13 +447,12 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
               {/* Threat level */}
               <div>
                 <div className="text-[8px] font-bold font-rajdhani tracking-widest theme-text-muted mb-1">KLASYFIKACJA</div>
-                <span className={`text-[11px] font-bold font-rajdhani tracking-widest px-2.5 py-1 border rounded ${
-                  threat.threat === "KRYTYCZNY" 
-                    ? "text-red-500 border-red-500/40 bg-red-500/10 animate-pulse" 
+                <span className={`text-[11px] font-bold font-rajdhani tracking-widest px-2.5 py-1 border rounded ${threat.threat === "KRYTYCZNY"
+                    ? "text-red-500 border-red-500/40 bg-red-500/10 animate-pulse"
                     : threat.threat === "SOJUSZNICZY"
-                    ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
-                    : "text-amber-500 border-amber-500/40 bg-amber-500/10"
-                }`}>
+                      ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
+                      : "text-amber-500 border-amber-500/40 bg-amber-500/10"
+                  }`}>
                   {threat.threat}
                 </span>
               </div>
