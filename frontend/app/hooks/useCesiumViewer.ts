@@ -472,8 +472,17 @@ export function useCesiumViewer({
             return;
           }
 
+          // Strip suffixes for deployed systems (like _model, _tower, _beacon, _label)
+          let baseId = entityId;
+          if (entityId.startsWith("sys_")) {
+            const parts = entityId.split("_");
+            if (parts.length > 2) {
+              baseId = `${parts[0]}_${parts[1]}`;
+            }
+          }
+
           // Check deployed systems
-          const matchedSystem = simStateRef.current.deployedSystems.find((s: DeployedSystem) => s.id === entityId);
+          const matchedSystem = simStateRef.current.deployedSystems.find((s: DeployedSystem) => s.id === baseId);
           if (matchedSystem) {
             if (setSelectedSystem) setSelectedSystem(matchedSystem);
             if (setSelectedNode) setSelectedNode(null);
