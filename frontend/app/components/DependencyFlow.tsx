@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ReactFlow,
   Background,
@@ -16,7 +16,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { CriticalNode } from "../types";
-import { Target, AlertTriangle } from "lucide-react";
+import { Target, AlertTriangle, Settings, Plus, Link as LinkIcon, X, Radio } from "lucide-react";
 
 // Coordinates for the 7 strategic nodes to render as a clear physical topology
 const INITIAL_NODE_POSITIONS: Record<string, { x: number; y: number }> = {
@@ -134,10 +134,95 @@ interface DependencyFlowProps {
   nodes: CriticalNode[];
   relations: NodeRelation[];
   onFlyTo?: (lat: number, lon: number, name: string) => void;
+  onAddNode?: (node: CriticalNode) => void;
+  onAddRelation?: (rel: NodeRelation) => void;
   theme?: "light" | "dark";
 }
 
-export function DependencyFlow({ nodes, relations, onFlyTo, theme = "light" }: DependencyFlowProps) {
+export function DependencyFlow({
+  nodes,
+  relations,
+  onFlyTo,
+  onAddNode,
+  onAddRelation,
+  theme = "light"
+}: DependencyFlowProps) {
+  // Panel States
+  const [showPanel, setShowPanel] = useState(false);
+  const [activeForm, setActiveForm] = useState<"node" | "relation">("node");
+
+  // Form states for Nowy Obiekt
+  const [nodeName, setNodeName] = useState("");
+  const [nodeType, setNodeType] = useState<CriticalNode["type"]>("industrial");
+  const [nodeLat, setNodeLat] = useState("50.5630");
+  const [nodeLon, setNodeLon] = useState("22.0490");
+  const [nodeDesc, setNodeDesc] = useState("");
+  const [nodeNotes, setNodeNotes] = useState("");
+
+  // Form states for Nowe Powiązanie
+  const [relSource, setRelSource] = useState("");
+  const [relTarget, setRelTarget] = useState("");
+  const [relLabel, setRelLabel] = useState("ZASILANIE");
+  const [customLabel, setCustomLabel] = useState("");
+
+  const handleAddNodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nodeName.trim() || !onAddNode) return;
+
+    const latNum = parseFloat(nodeLat) || 50.5630;
+    const lonNum = parseFloat(nodeLon) || 22.0490;
+    const newId = `OBJ_${(nodes.length + 1).toString().padStart(2, "0")}`;
+
+    const newNode: CriticalNode = {
+      id: newId,
+      name: nodeName,
+      type: nodeType,
+      lat: latNum,
+      lon: lonNum,
+      description: nodeDesc || `Nowy obiekt: ${nodeName}`,
+      health: 100,
+      status: "OPERATIONAL",
+      backupPower: false,
+      notes: nodeNotes || "Brak aktywnych zaburzeń strukturalnych."
+    };
+
+    onAddNode(newNode);
+    
+    // Reset fields
+    setNodeName("");
+    setNodeType("industrial");
+    setNodeLat("50.5630");
+    setNodeLon("22.0490");
+    setNodeDesc("");
+    setNodeNotes("");
+  };
+
+  const handleAddRelSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onAddRelation) return;
+    const source = relSource || (nodes[0]?.id || "");
+    const target = relTarget || (nodes[1]?.id || "");
+    
+    if (!source || !target || source === target) return;
+
+    const finalLabel = relLabel === "CUSTOM" ? customLabel : relLabel;
+    if (!finalLabel.trim()) return;
+
+    const newRelation: NodeRelation = {
+      source,
+      target,
+      label: finalLabel.toUpperCase()
+    };
+
+    onAddRelation(newRelation);
+    
+    // Reset fields
+    setRelSource("");
+    setRelTarget("");
+    setRelLabel("ZASILANIE");
+    setCustomLabel("");
+  };
+
   // Construct initial flow nodes state (only runs once on mount)
   const initialNodes = React.useMemo<Node[]>(() => {
     return nodes.map((node) => ({
@@ -235,6 +320,216 @@ export function DependencyFlow({ nodes, relations, onFlyTo, theme = "light" }: D
           <span>DIAGRAM TOPOLOGII SIECI PRZESYŁOWYCH</span>
         </div>
         <span>Wizualizacja aktywnych kaskadowych powiązań infrastruktury krytycznej.</span>
+      </div>
+
+      {/* Dynamic Node/Relation Floating Editor Panel */}
+      <div className="absolute top-3 right-3 z-30 flex flex-col items-end pointer-events-auto">
+        <button
+          onClick={() => setShowPanel(!showPanel)}
+          className="px-3 py-1.5 border border-cyan-500/30 theme-bg-panel hover:theme-neon-border text-[9px] font-bold font-rajdhani theme-neon-text tracking-wider shadow-lg flex items-center gap-1.5 clip-chamfer cursor-pointer transition-all hover:bg-cyan-500/10"
+        >
+          <Settings className="w-3.5 h-3.5 animate-spin-slow" style={{ animationDuration: '6s' }} />
+          <span>{showPanel ? "ZAMKNIJ EDYTOR WĘZŁÓW" : "ZARZĄDZANIE WĘZŁAMI"}</span>
+        </button>
+
+        {showPanel && (
+          <div className="mt-2 w-80 theme-bg-panel border theme-border p-3.5 rounded shadow-2xl backdrop-blur-md text-[10px] font-mono theme-text-primary clip-chamfer max-h-[80vh] overflow-y-auto terminal-scroll">
+            <div className="flex justify-between items-center pb-2 border-b theme-border mb-3">
+              <span className="font-rajdhani font-extrabold tracking-wider text-[11px] theme-neon-text">KREATOR ELEMENTÓW SIECI</span>
+              <button onClick={() => setShowPanel(false)} className="text-slate-400 hover:text-white cursor-pointer"><X className="w-3.5 h-3.5" /></button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 mb-4">
+              <button
+                onClick={() => setActiveForm("node")}
+                className={`py-1 text-center border font-bold text-[8px] tracking-wide rounded cursor-pointer transition-all ${
+                  activeForm === "node"
+                    ? "bg-cyan-500/20 border-cyan-500 theme-neon-text"
+                    : "theme-bg-button theme-border theme-text-secondary hover:theme-text-primary hover:theme-neon-border"
+                }`}
+              >
+                + REJESTRUJ OBIEKT
+              </button>
+              <button
+                onClick={() => setActiveForm("relation")}
+                className={`py-1 text-center border font-bold text-[8px] tracking-wide rounded cursor-pointer transition-all ${
+                  activeForm === "relation"
+                    ? "bg-cyan-500/20 border-cyan-500 theme-neon-text"
+                    : "theme-bg-button theme-border theme-text-secondary hover:theme-text-primary hover:theme-neon-border"
+                }`}
+              >
+                + UTWÓRZ POWIĄZANIE
+              </button>
+            </div>
+
+            {activeForm === "node" ? (
+              <form onSubmit={handleAddNodeSubmit} className="space-y-2.5">
+                <div>
+                  <label className="block text-[8px] theme-text-muted mb-1">NAZWA WĘZŁA STRATEGICZNEGO:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="np. ELEKTROWNIA STALOWA WOLA"
+                    value={nodeName}
+                    onChange={(e) => setNodeName(e.target.value)}
+                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] placeholder:opacity-40"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[8px] theme-text-muted mb-1">KLASYFIKACJA SEKTORA:</label>
+                    <select
+                      value={nodeType}
+                      onChange={(e) => setNodeType(e.target.value as any)}
+                      className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                    >
+                      <option value="industrial">Huta / Przemysł</option>
+                      <option value="power">Elektrownia / Agregat</option>
+                      <option value="water">Ujęcie Wody / Pompownia</option>
+                      <option value="electrical">Rozdzielnia GPZ</option>
+                      <option value="logistic">Węzeł Gazowy / Paliwowy</option>
+                      <option value="transit">Dworzec / Tranzyt</option>
+                      <option value="hq">Sztab Kryzysowy / Dowodzenie</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[8px] theme-text-muted mb-1">LOKALIZACJA GPS LUB SEKTOR:</label>
+                    <div className="text-[8px] text-cyan-400 font-semibold py-1.5 px-1 bg-slate-950/50 border theme-border rounded text-center">
+                      DOMYŚLNE WSPÓŁRZĘDNE
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[8px] theme-text-muted mb-1">SZEROKOŚĆ (LAT):</label>
+                    <input
+                      type="text"
+                      required
+                      value={nodeLat}
+                      onChange={(e) => setNodeLat(e.target.value)}
+                      className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[8px] theme-text-muted mb-1">DŁUGOŚĆ (LON):</label>
+                    <input
+                      type="text"
+                      required
+                      value={nodeLon}
+                      onChange={(e) => setNodeLon(e.target.value)}
+                      className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[8px] theme-text-muted mb-1">OPIS WYWIADOWCZY:</label>
+                  <textarea
+                    placeholder="Główny sektor zaopatrzenia, kluczowe podstacje zasilające..."
+                    value={nodeDesc}
+                    onChange={(e) => setNodeDesc(e.target.value)}
+                    rows={2}
+                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] resize-none placeholder:opacity-40"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[8px] theme-text-muted mb-1">INFORMACJA O POWIĄZANIACH:</label>
+                  <textarea
+                    placeholder="Brak aktywnych zaburzeń strukturalnych gridu..."
+                    value={nodeNotes}
+                    onChange={(e) => setNodeNotes(e.target.value)}
+                    rows={2}
+                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] resize-none placeholder:opacity-40"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-1.5 theme-bg-app border border-cyan-500 hover:bg-cyan-500/20 theme-neon-text font-bold text-[9px] tracking-widest clip-chamfer transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>DODAJ NOWY WĘZEŁ</span>
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleAddRelSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-[8px] theme-text-muted mb-1">WĘZEŁ STRATEGICZNY ŹRÓDŁOWY (DONOR):</label>
+                  <select
+                    value={relSource}
+                    onChange={(e) => setRelSource(e.target.value)}
+                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                  >
+                    <option value="">Wybierz węzeł dawcę...</option>
+                    {nodes.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.name} ({n.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[8px] theme-text-muted mb-1">WĘZEŁ STRATEGICZNY DOCELOWY (AKCEPTOR):</label>
+                  <select
+                    value={relTarget}
+                    onChange={(e) => setRelTarget(e.target.value)}
+                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                  >
+                    <option value="">Wybierz węzeł biorcę...</option>
+                    {nodes.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.name} ({n.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[8px] theme-text-muted mb-1">KATEGORIA STRUMIENIA PRZEPŁYWU:</label>
+                  <select
+                    value={relLabel}
+                    onChange={(e) => setRelLabel(e.target.value)}
+                    className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px]"
+                  >
+                    <option value="ZASILANIE">ZASILANIE (ELEKTRYCZNE)</option>
+                    <option value="PALIWO">PALIWO (GAZ / MAZUT)</option>
+                    <option value="CHŁODZIWO">CHŁODZIWO (WODA HYDROGRAFICZNA)</option>
+                    <option value="TELCO">TELCO (ŁĄCZNOŚĆ ŚWIATŁOWODOWA)</option>
+                    <option value="DOWODZENIE">DOWODZENIE (STRATEGICZNE / C2)</option>
+                    <option value="LOGISTYKA">LOGISTYKA (ZAOPATRZENIE SPALNE)</option>
+                    <option value="CUSTOM">INNY / ZDEFINIUJ RĘCZNIE...</option>
+                  </select>
+                </div>
+
+                {relLabel === "CUSTOM" && (
+                  <div>
+                    <label className="block text-[8px] theme-text-muted mb-1">ZDEFINIUJ WŁASNY TYP PRZEPŁYWU:</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="np. TRANSFER MATERIAŁÓW"
+                      value={customLabel}
+                      onChange={(e) => setCustomLabel(e.target.value)}
+                      className="w-full bg-slate-950/80 border theme-border rounded px-2 py-1 theme-text-primary outline-none focus:theme-neon-border text-[9px] uppercase"
+                    />
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-1.5 theme-bg-app border border-cyan-500 hover:bg-cyan-500/20 theme-neon-text font-bold text-[9px] tracking-widest clip-chamfer transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+                >
+                  <LinkIcon className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>UTWÓRZ AKTYWNE POWIĄZANIE</span>
+                </button>
+              </form>
+            )}
+          </div>
+        )}
       </div>
 
       <ReactFlow

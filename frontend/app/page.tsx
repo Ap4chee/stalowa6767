@@ -383,6 +383,8 @@ export default function SteelSentinelDashboard() {
             nodes={nodes}
             relations={relations}
             theme={theme}
+            onAddNode={handleAddNode}
+            onAddRelation={handleAddRelation}
             onFlyTo={(lat, lon, name) => {
               // Automatically switch back to 3D map view
               setSchemaModeEnabled(false);
