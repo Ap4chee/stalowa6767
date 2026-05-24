@@ -813,6 +813,29 @@ export function useCesiumViewer({
     });
     relationEntitiesGroupRef.current = [];
 
+    // Helper to generate elegant 3D parabolic geodesic curves
+    const generateParabolicPositions = (
+      startLon: number,
+      startLat: number,
+      endLon: number,
+      endLat: number,
+      numPoints = 24
+    ) => {
+      const positions = [];
+      for (let i = 0; i <= numPoints; i++) {
+        const t = i / numPoints;
+        const lon = startLon + (endLon - startLon) * t;
+        const lat = startLat + (endLat - startLat) * t;
+        
+        // Parabolic rise peaking at 180 meters in the center
+        const peakHeight = 160;
+        const alt = 25 + 4 * peakHeight * t * (1 - t);
+        
+        positions.push(Cesium.Cartesian3.fromDegrees(lon, lat, alt));
+      }
+      return positions;
+    };
+
     // Render relations
     relations.forEach((rel) => {
       const sourceNode = nodes.find(n => n.id === rel.source);
@@ -825,16 +848,14 @@ export function useCesiumViewer({
         ? Cesium.Color.ORANGE 
         : Cesium.Color.CYAN;
 
+      // 1. Futuristic Curved Geodesic Glow Polyline
       const polylineEntity = viewer.entities.add({
         polyline: {
-          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
-            sourceNode.lon, sourceNode.lat, 25,
-            targetNode.lon, targetNode.lat, 25
-          ]),
-          width: 3.5,
+          positions: generateParabolicPositions(sourceNode.lon, sourceNode.lat, targetNode.lon, targetNode.lat),
+          width: 2.5,
           material: new Cesium.PolylineGlowMaterialProperty({
-            glowPower: 0.25,
-            color: color.withAlpha(0.7)
+            glowPower: 0.35,
+            color: color.withAlpha(0.85)
           })
         },
         show: mapLayers.relations
@@ -842,25 +863,37 @@ export function useCesiumViewer({
 
       relationEntitiesGroupRef.current.push(polylineEntity);
 
-      // Label at middle position of the relation
+      // 2. Glowing Flow Peak Node & Label Card (Floating pill-shaped tactical label)
       const midLon = (sourceNode.lon + targetNode.lon) / 2;
       const midLat = (sourceNode.lat + targetNode.lat) / 2;
-      const labelEntity = viewer.entities.add({
-        position: Cesium.Cartesian3.fromDegrees(midLon, midLat, 45),
-        label: {
-          text: rel.label.toUpperCase(),
-          font: "bold 24px Share Tech Mono, monospace",
-          fillColor: color,
+      const midAlt = 25 + 160; // Exact peak altitude
+
+      const peakLabelEntity = viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(midLon, midLat, midAlt),
+        point: {
+          pixelSize: 6,
+          color: color,
           outlineColor: Cesium.Color.BLACK,
-          outlineWidth: 4,
-          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-          scale: 0.35,
+          outlineWidth: 1.5,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        label: {
+          text: `  ${rel.label.toUpperCase()}  `,
+          font: "bold 10px JetBrains Mono, monospace, Share Tech Mono",
+          fillColor: Cesium.Color.WHITE,
+          style: Cesium.LabelStyle.FILL,
+          showBackground: true,
+          backgroundColor: color.withAlpha(0.8),
+          backgroundPadding: new Cesium.Cartesian2(6, 4),
+          scale: 0.9,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -8),
           disableDepthTestDistance: Number.POSITIVE_INFINITY
         },
         show: mapLayers.relations
       });
 
-      relationEntitiesGroupRef.current.push(labelEntity);
+      relationEntitiesGroupRef.current.push(peakLabelEntity);
     });
   }, [relations, nodes, mapLayers.relations, isCesiumLoaded]);
 
