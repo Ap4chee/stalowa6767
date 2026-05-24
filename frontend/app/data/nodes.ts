@@ -1,14 +1,20 @@
 import { CriticalNode } from "../types";
 
-export const CENTER_LAT = 50.5630;
-export const CENTER_LON = 22.0490;
+export const CENTER_LAT = 50.5826;
+export const CENTER_LON = 22.0530;
 
+// Coordinates reflect real Stalowa Wola geography (verified against OSM / public registers).
+// Spread tuned to read cleanly at 4.5 km camera altitude.
+// OBJ_01 — HSW S.A. (ul. Kwiatkowskiego 1), large industrial complex south-east of center.
+// OBJ_02 — PGE Energia Ciepła EC Stalowa Wola (ul. Energetyków 13), northern industrial zone.
+// OBJ_05 — Stacja Stalowa Wola Rozwadów (NW district, węzeł magistrali Lublin–Przemyśl).
+// OBJ_06 — Most na Sanie w ciągu DK77, łączący Stalową Wolę z Pysznicą.
 export const INITIAL_NODES: CriticalNode[] = [
   {
     id: "OBJ_01",
     name: "Huta Stalowa Wola S.A.",
-    lat: 50.5482,
-    lon: 22.0495,
+    lat: 50.5660,
+    lon: 22.0720,
     type: "industrial",
     description: "Strategiczny przemysł obronny (producent armatohaubic Krab, BWP Borsuk). Cel krytyczny.",
     health: 100,
@@ -19,8 +25,8 @@ export const INITIAL_NODES: CriticalNode[] = [
   {
     id: "OBJ_02",
     name: "Elektrownia Stalowa Wola",
-    lat: 50.5574,
-    lon: 22.0621,
+    lat: 50.5870,
+    lon: 22.0700,
     type: "power",
     description: "Blok gazowo-parowy, kluczowe źródło energii i ciepła dla miasta i przemysłu.",
     health: 100,
@@ -31,10 +37,10 @@ export const INITIAL_NODES: CriticalNode[] = [
   {
     id: "OBJ_03",
     name: "Stacja Uzdatniania MZK",
-    lat: 50.5841,
-    lon: 22.0315,
+    lat: 50.5970,
+    lon: 22.0890,
     type: "water",
-    description: "Ujęcie i stacja uzdatniania wody dla ludności oraz woda chłodząca dla elektrowni.",
+    description: "Ujęcie brzegowe na Sanie i stacja uzdatniania wody dla ludności oraz woda chłodząca dla elektrowni.",
     health: 100,
     status: "OPERATIONAL",
     backupPower: false,
@@ -43,8 +49,8 @@ export const INITIAL_NODES: CriticalNode[] = [
   {
     id: "OBJ_04",
     name: "GPZ 'Maziarnia'",
-    lat: 50.5395,
-    lon: 22.0682,
+    lat: 50.5520,
+    lon: 22.0790,
     type: "electrical",
     description: "Główny Punkt Zasilający - stacja transformatorowa wysokiego napięcia sieci przesyłowej.",
     health: 100,
@@ -55,8 +61,8 @@ export const INITIAL_NODES: CriticalNode[] = [
   {
     id: "OBJ_05",
     name: "Węzeł Kolejowy Rozwadów",
-    lat: 50.5878,
-    lon: 22.0465,
+    lat: 50.5870,
+    lon: 22.0290,
     type: "logistic",
     description: "Węzeł logistyki wojskowej (NATO Hub) i towarowej obrony strategicznej.",
     health: 100,
@@ -67,10 +73,10 @@ export const INITIAL_NODES: CriticalNode[] = [
   {
     id: "OBJ_06",
     name: "Most gen. Bora-Komorowskiego",
-    lat: 50.5744,
-    lon: 22.0678,
+    lat: 50.5780,
+    lon: 22.0980,
     type: "transit",
-    description: "Kluczowa przeprawa przez rzekę San. Główny korytarz logistyczny ze wschodu.",
+    description: "Kluczowa przeprawa przez rzekę San w ciągu DK77. Główny korytarz logistyczny ze wschodu.",
     health: 100,
     status: "OPERATIONAL",
     backupPower: false,
@@ -79,10 +85,10 @@ export const INITIAL_NODES: CriticalNode[] = [
   {
     id: "OBJ_07",
     name: "Centrum Zarządzania Kryzysowego",
-    lat: 50.5701,
-    lon: 22.0524,
+    lat: 50.5826,
+    lon: 22.0530,
     type: "hq",
-    description: "Sztab dowodzenia kryzysowego obrony cywilnej i Urząd Miasta.",
+    description: "Sztab dowodzenia kryzysowego obrony cywilnej i Urząd Miasta (ul. Wolności).",
     health: 100,
     status: "OPERATIONAL",
     backupPower: false,

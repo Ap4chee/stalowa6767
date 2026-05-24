@@ -1,7 +1,8 @@
 "use client";
 
 import { Threat, CriticalNode } from "../types";
-import { CollapsibleCard } from "./CollapsibleCard";
+import { Panel, StatusPill } from "../ui";
+import { ChevronDown } from "lucide-react";
 
 interface ThreatMonitorProps {
   threats: Threat[];
@@ -10,65 +11,96 @@ interface ThreatMonitorProps {
   onToggle: () => void;
 }
 
+const threatLabel: Record<string, string> = {
+  DRONE: "Dron",
+  SHAHED: "Shahed",
+  MISSILE: "Rakieta"
+};
+
+const statusMeta: Record<Threat["status"], { tone: "error" | "ok" | "info" | "neutral"; label: string }> = {
+  FLYING:      { tone: "error",   label: "Aktywny" },
+  INTERCEPTED: { tone: "ok",      label: "Zestrzelony" },
+  JAMMED:      { tone: "info",    label: "Zakłócony" },
+  IMPACTED:    { tone: "neutral", label: "Trafienie" }
+};
+
 export function ThreatMonitor({ threats, nodes, isCollapsed, onToggle }: ThreatMonitorProps) {
   const activeCount = threats.filter(t => t.status === "FLYING").length;
 
-  return (
-    <div className="w-full font-mono theme-bg-panel border theme-border clip-chamfer shadow-2xl backdrop-blur-md transition-all duration-300">
-      <CollapsibleCard
-        title="MONITOR RADAROWY"
-        isCollapsed={isCollapsed}
-        onToggle={onToggle}
-        badge={
-          <span className={`text-[9px] px-1.5 border font-bold font-sharetech ${
-            activeCount > 0
-              ? "bg-red-950/20 border-red-550/40 text-red-500"
-              : "theme-bg-app border theme-border theme-text-muted"
-          }`}>
-            {activeCount} CELE
-          </span>
-        }
-        headerClassName={`px-3 py-1.5 transition-all ${
-          activeCount > 0
-            ? "text-red-400 bg-red-950/10 hover:bg-red-950/20 border-b border-red-900/30 cursor-pointer"
-            : "theme-text-secondary hover:theme-bg-panel-hover border-b theme-border cursor-pointer"
-        }`}
-        fixedHeight={130}
+  // Collapsed: compact bar with minimal chrome
+  if (isCollapsed) {
+    return (
+      <button
+        onClick={onToggle}
+        className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-(--r-md) bg-surface-1 elev-1 hover:bg-surface-hover cursor-pointer text-left w-full transition-colors shrink-0"
       >
-        <div className="overflow-y-auto terminal-scroll" style={{ maxHeight: 130 }}>
-          {threats.length === 0 ? (
-            <div className="h-[100px] flex items-center justify-center text-[10px] theme-text-muted font-sharetech italic select-none">
-              BRAK AKTYWNYCH ECH
-            </div>
-          ) : (
-            <div className="p-2 space-y-1">
-              {[...threats].reverse().map((threat) => {
-                const targetNode = nodes.find(n => n.id === threat.targetId);
-                return (
-                  <div key={threat.id}
-                    className={`p-1.5 border flex items-center justify-between ${
-                      threat.status === "FLYING" ? "border-red-500/60 bg-red-500/10 text-red-700 dark:text-red-400"
-                        : threat.status === "INTERCEPTED" ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold"
-                        : threat.status === "JAMMED" ? "border-cyan-550 bg-cyan-500/10 text-cyan-750 dark:text-cyan-400"
-                        : "theme-border theme-bg-app theme-text-muted line-through"
-                    }`}>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-bold text-[9px] font-sharetech">{threat.name} ({threat.type})</span>
-                      <span className="text-[8px] theme-text-secondary font-semibold">Cel: {targetNode?.name || "Nieznany"}</span>
-                    </div>
-                    <span className="text-[9px] font-bold font-rajdhani px-1 py-0.5">
-                      {threat.status === "FLYING" && "AKTYWNY"}
-                      {threat.status === "INTERCEPTED" && "ZESTRZELONY"}
-                      {threat.status === "JAMMED" && "ZAKŁÓCONY"}
-                      {threat.status === "IMPACTED" && "TRAFIENIE"}
+        <div className="flex items-center gap-2.5">
+          <ChevronDown className="w-3.5 h-3.5 text-muted -rotate-90 transition-transform duration-(--dur-base)" />
+          <span className="text-body text-primary">Wykryte cele</span>
+        </div>
+        {activeCount > 0 ? (
+          <StatusPill tone="error" size="xs" dot pulse>{activeCount} aktywne</StatusPill>
+        ) : (
+          <span className="text-caption text-muted">brak echa</span>
+        )}
+      </button>
+    );
+  }
+
+  // Expanded: full Panel
+  return (
+    <Panel variant="floating" rounded="xl" className="flex flex-col overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-surface-hover cursor-pointer text-left w-full transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <ChevronDown className="w-4 h-4 text-muted transition-transform duration-(--dur-base)" />
+          <div className="flex flex-col leading-tight">
+            <span className="text-micro text-muted">Radar</span>
+            <span className="text-heading text-primary">Wykryte cele</span>
+          </div>
+        </div>
+        {activeCount > 0 ? (
+          <StatusPill tone="error" size="xs" dot pulse>{activeCount} aktywne</StatusPill>
+        ) : (
+          <span className="text-micro text-muted">brak echa</span>
+        )}
+      </button>
+
+      <div className="px-3 pb-3 max-h-48 overflow-y-auto scroll-thin">
+        {threats.length === 0 ? (
+          <div className="px-3 py-6 text-caption text-muted text-center">
+            Niebo czyste — brak aktywnych ech radarowych.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {[...threats].reverse().map((threat) => {
+              const targetNode = nodes.find(n => n.id === threat.targetId);
+              const meta = statusMeta[threat.status];
+
+              return (
+                <div
+                  key={threat.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-(--r-sm) hover:bg-surface-hover transition-colors"
+                >
+                  <div className="flex flex-col min-w-0">
+                    <span className={`text-caption truncate ${threat.status === "IMPACTED" ? "line-through text-muted" : "text-primary"}`}>
+                      {threatLabel[threat.type] || threat.type}
+                    </span>
+                    <span className="text-micro text-muted truncate">
+                      → {targetNode?.name || "nieznany cel"}
                     </span>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </CollapsibleCard>
-    </div>
+                  <StatusPill tone={meta.tone} size="xs" dot pulse={threat.status === "FLYING"}>
+                    {meta.label}
+                  </StatusPill>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Panel>
   );
 }

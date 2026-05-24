@@ -1,6 +1,7 @@
 "use client";
 
-import { Shield, Compass, Volume2, VolumeX, Network, Sun, Moon, Crosshair } from "lucide-react";
+import { Volume2, VolumeX, Sun, Moon, Network, Crosshair, Brain } from "lucide-react";
+import { Button, IconButton } from "../ui";
 import { LogType } from "../types";
 
 interface HeaderProps {
@@ -8,13 +9,31 @@ interface HeaderProps {
   clockTime: string;
   soundEnabled: boolean;
   onToggleSound: () => void;
-  onAddLog: (text: string, type: LogType) => void;
   schemaModeEnabled: boolean;
   onToggleSchemaMode: () => void;
   theme: "light" | "dark";
   onToggleTheme: () => void;
   onOpenThreatViewer: () => void;
+  strategOpen: boolean;
+  onToggleStrateg: () => void;
+  onAddLog?: (text: string, type: LogType) => void;
 }
+
+type DefconMeta = {
+  label: string;
+  bg: string;
+  textTone: string;
+  dotVar: string;
+  pulse: boolean;
+};
+
+const defconMeta: Record<number, DefconMeta> = {
+  5: { label: "Stan pokoju",     bg: "bg-surface-data",  textTone: "text-ok",       dotVar: "bg-(--ok)",       pulse: false },
+  4: { label: "Czujność",        bg: "bg-surface-data",  textTone: "text-info",     dotVar: "bg-(--info)",     pulse: false },
+  3: { label: "Gotowość bojowa", bg: "bg-warn-soft",     textTone: "text-warn",     dotVar: "bg-(--warn)",     pulse: false },
+  2: { label: "Zagrożenie",      bg: "bg-error-soft",    textTone: "text-error",    dotVar: "bg-(--error)",    pulse: true  },
+  1: { label: "Aktywny nalot",   bg: "bg-critical-soft", textTone: "text-critical", dotVar: "bg-(--critical)", pulse: true  }
+};
 
 export function Header({
   defcon,
@@ -26,95 +45,93 @@ export function Header({
   theme,
   onToggleTheme,
   onOpenThreatViewer,
+  strategOpen,
+  onToggleStrateg
 }: HeaderProps) {
+  const meta = defconMeta[defcon] || defconMeta[5];
+
   return (
-    <header className="fixed top-0 left-0 w-full z-[60] flex justify-between items-center px-4 h-12 border-b theme-border theme-bg-panel font-rajdhani backdrop-blur-md">
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <Shield className="w-5 h-5 theme-neon-text animate-pulse" />
-          <span className="font-extrabold tracking-widest text-[14px] theme-neon-text">STEEL SENTINEL</span>
-          <span className="text-[9px] theme-bg-app border theme-border px-1.5 py-0.5 theme-text-secondary font-mono tracking-normal">
-            CESIUM_COP v4.0.2
-          </span>
+    <header className="fixed top-3 left-3 right-3 z-60 h-14 bg-surface-1 elev-2 rounded-(--r-lg) flex items-center pl-3 pr-2.5 gap-3">
+      {/* Brand */}
+      <div className="flex items-center gap-2.5 pr-1">
+        <div className="w-8 h-8 rounded-(--r-sm) bg-(--text-1) flex items-center justify-center">
+          <span className="text-(--canvas) font-semibold text-caption leading-none">S</span>
         </div>
-        <div className="hidden md:flex items-center gap-4 border-l theme-border pl-6 h-8 text-[11px] font-mono theme-text-secondary">
-          <div className="flex items-center gap-1.5">
-            <Compass className="w-3.5 h-3.5 theme-text-muted" />
-            <span>STALOWA WOLA DIGITAL TWIN / REAL 3D GIS</span>
-          </div>
+        <div className="flex flex-col leading-tight">
+          <span className="text-heading text-primary tracking-tight">Steel Sentinel</span>
+          <span className="text-micro text-muted">Stalowa Wola · Digital Twin</span>
         </div>
       </div>
-      <div className="flex items-center gap-4 font-mono">
-        <button
-          onClick={onToggleSchemaMode}
-          className={`px-3 py-1 text-[10px] border flex items-center gap-1.5 font-bold tracking-widest transition-all cursor-pointer ${schemaModeEnabled
-            ? "theme-neon-border bg-cyan-500/10 theme-neon-text animate-pulse"
-            : "theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-panel-hover"
-            }`}
-          title="Przełącz podgląd grafu powiązań sieciowych"
-        >
-          <Network className="w-3.5 h-3.5" />
-          <span>SCHEMAT POWIĄZAŃ</span>
-        </button>
-        <button
-          onClick={onOpenThreatViewer}
-          className="px-3 py-1 text-[10px] border flex items-center gap-1.5 font-bold tracking-widest transition-all cursor-pointer theme-border theme-text-secondary hover:theme-text-primary hover:theme-bg-panel-hover"
-          title="Otwórz podgląd 3D modeli zagrożeń"
-        >
-          <Crosshair className="w-3.5 h-3.5" />
-          <span>BAZA OBIEKTÓW 3D</span>
-        </button>
-        {(() => {
-          const colors: Record<number, string> = {
-            5: "border-emerald-500 bg-emerald-500/10 text-emerald-500",
-            4: "border-cyan-550 bg-cyan-500/10 text-cyan-400",
-            3: "border-amber-400 bg-amber-500/10 text-amber-500",
-            2: "border-orange-550 bg-orange-550/10 text-orange-550 animate-pulse",
-            1: "border-red-600 bg-red-500/10 text-red-500 animate-pulse font-bold"
-          };
 
-          const dotColors: Record<number, string> = {
-            5: "bg-emerald-500",
-            4: "bg-cyan-400",
-            3: "bg-amber-400",
-            2: "bg-orange-500",
-            1: "bg-red-550"
-          };
-
-          const colorClass = colors[defcon] || colors[5];
-          const dotColorClass = dotColors[defcon] || dotColors[5];
-
-          return (
-            <div className={`flex items-center gap-2 px-3 py-1 border transition-all ${colorClass}`}>
-              <span className="text-[10px] font-bold tracking-widest font-sharetech">DEFCON {defcon}</span>
-              <span className={`w-2 h-2 rounded-full ${dotColorClass}`} />
-            </div>
-          );
-        })()}
-        <div className="text-[11px] theme-text-secondary tabular-nums border-l theme-border pl-4 h-12 flex items-center">
-          {clockTime || "--:--:--"} UTC
+      {/* DEFCON — unified chip (escalates with status) */}
+      <div
+        className={[
+          "flex items-center gap-3 pl-3 pr-3.5 h-10 rounded-(--r-md) border border-subtle",
+          meta.bg
+        ].join(" ")}
+      >
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dotVar} ${meta.pulse ? "anim-pulse" : ""}`} />
+        <span className="text-display text-primary leading-none">{defcon}</span>
+        <div className="flex flex-col leading-tight">
+          <span className="text-micro text-muted">DEFCON</span>
+          <span className={`text-label ${meta.textTone}`}>{meta.label}</span>
         </div>
+      </div>
 
-        {/* Theme Toggle Button */}
-        <button
+      <div className="flex-1" />
+
+      {/* Clock */}
+      <div className="flex items-baseline gap-1.5 pr-1">
+        <span className="text-data text-primary">{clockTime || "--:--:--"}</span>
+        <span className="text-micro text-muted">UTC</span>
+      </div>
+
+      {/* Action cluster — named view shortcuts + preference toggles */}
+      <div className="flex items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Network className="w-3.5 h-3.5" />}
+          active={schemaModeEnabled}
+          kbd="S"
+          onClick={onToggleSchemaMode}
+          title="Otwórz schemat zależności sieci przesyłowych"
+        >
+          Schemat sieci
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Crosshair className="w-3.5 h-3.5" />}
+          kbd="M"
+          onClick={onOpenThreatViewer}
+          title="Otwórz katalog 3D zagrożeń i środków przeciwdziałania"
+        >
+          Katalog 3D
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Brain className="w-3.5 h-3.5" />}
+          active={strategOpen}
+          kbd="A"
+          onClick={onToggleStrateg}
+          title="STRATEG AI — analiza strategiczna z wizją mapy"
+        >
+          STRATEG AI
+        </Button>
+        <span className="w-px h-5 bg-(--border-subtle) mx-1" />
+        <IconButton
+          icon={theme === "light" ? <Moon /> : <Sun />}
           onClick={onToggleTheme}
-          className={`p-1.5 border transition-all flex items-center justify-center theme-bg-button hover:theme-bg-button/80 cursor-pointer ${theme === "light"
-            ? "border-amber-500/60 text-amber-600 bg-amber-500/10"
-            : "border-cyan-500/60 text-cyan-400 bg-cyan-950/10"
-            }`}
-          title={theme === "light" ? "Przełącz na Tryb Ciemny" : "Przełącz na Tryb Jasny"}
-        >
-          {theme === "light" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
-
-        <button
+          tooltip={theme === "light" ? "Tryb ciemny" : "Tryb jasny"}
+        />
+        <IconButton
+          icon={soundEnabled ? <Volume2 /> : <VolumeX />}
+          active={soundEnabled}
           onClick={onToggleSound}
-          className={`p-1.5 border transition-all flex items-center justify-center theme-bg-button hover:theme-bg-button/80 cursor-pointer ${soundEnabled ? "theme-neon-border theme-neon-text bg-cyan-500/10" : "theme-border theme-text-muted"
-            }`}
-          title="Włącz/Wyłącz sygnały dźwiękowe"
-        >
-          {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-        </button>
+          tooltip={soundEnabled ? "Wycisz" : "Włącz dźwięki"}
+        />
       </div>
     </header>
   );

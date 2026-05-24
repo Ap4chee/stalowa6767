@@ -1,7 +1,8 @@
 "use client";
 
 import { LogEntry } from "../types";
-import { CollapsibleCard } from "./CollapsibleCard";
+import { Panel } from "../ui";
+import { ChevronDown } from "lucide-react";
 
 interface CommandLoggerProps {
   logs: LogEntry[];
@@ -10,42 +11,62 @@ interface CommandLoggerProps {
   onToggle: () => void;
 }
 
+const typeColor: Record<LogEntry["type"], string> = {
+  error:   "text-error",
+  warning: "text-warn",
+  success: "text-ok",
+  combat:  "text-error",
+  info:    "text-secondary"
+};
+
 export function CommandLogger({ logs, clockTime, isCollapsed, onToggle }: CommandLoggerProps) {
-  return (
-    <div className="w-full font-mono theme-bg-panel border theme-border clip-chamfer shadow-2xl backdrop-blur-md transition-all duration-300">
-      <CollapsibleCard
-        title="KONSOLA ZDARZEŃ"
-        isCollapsed={isCollapsed}
-        onToggle={onToggle}
-        badge={
-          <span className="text-[8px] theme-text-muted font-sharetech">SECURE FEED</span>
-        }
-        headerClassName="px-3 py-1.5 theme-text-secondary hover:theme-bg-panel-hover border-b theme-border"
-        fixedHeight={130}
+  // Collapsed: compact bar with minimal chrome
+  if (isCollapsed) {
+    return (
+      <button
+        onClick={onToggle}
+        className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-(--r-md) bg-surface-1 elev-1 hover:bg-surface-hover cursor-pointer text-left w-full transition-colors shrink-0"
       >
-        <div className="overflow-y-auto text-[10px] leading-relaxed theme-text-secondary terminal-scroll font-sharetech" style={{ maxHeight: 130 }}>
-          <div className="p-2 space-y-1">
-            {logs.map((log, idx) => (
-              <div key={idx} className="flex gap-2">
-                <span className="theme-neon-text font-bold shrink-0">[{log.timestamp}]</span>
-                <span className={`${
-                  log.type === "error" ? "text-red-600 dark:text-red-500 font-bold"
-                    : log.type === "warning" ? "text-amber-600 dark:text-amber-400 font-semibold"
-                    : log.type === "success" ? "text-emerald-600 dark:text-emerald-400 font-semibold"
-                    : log.type === "combat" ? "text-red-500 dark:text-red-400 font-bold tracking-wide"
-                    : "theme-text-primary"
-                }`}>
-                  {log.text}
-                </span>
-              </div>
-            ))}
-            <div className="flex gap-2">
-              <span className="theme-neon-text font-bold shrink-0">[{clockTime || "--:--:--"}]</span>
-              <span className="w-1.5 h-3 theme-neon-bg animate-pulse" />
-            </div>
+        <div className="flex items-center gap-2.5">
+          <ChevronDown className="w-3.5 h-3.5 text-muted -rotate-90 transition-transform duration-(--dur-base)" />
+          <span className="text-body text-primary">Dziennik zdarzeń</span>
+        </div>
+        <span className="text-caption text-muted">{logs.length}</span>
+      </button>
+    );
+  }
+
+  // Expanded: full Panel with logs
+  return (
+    <Panel variant="floating" rounded="xl" className="flex flex-col overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="flex items-center justify-between gap-3 px-5 py-3 hover:bg-surface-hover cursor-pointer text-left w-full transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <ChevronDown className="w-4 h-4 text-muted transition-transform duration-(--dur-base)" />
+          <div className="flex flex-col leading-tight">
+            <span className="text-micro text-muted">Konsola</span>
+            <span className="text-heading text-primary">Dziennik zdarzeń</span>
           </div>
         </div>
-      </CollapsibleCard>
-    </div>
+        <span className="text-micro text-muted">{logs.length} wpisów</span>
+      </button>
+
+      <div className="px-3 pb-3 max-h-48 overflow-y-auto scroll-thin">
+        <div className="flex flex-col gap-1 px-2 pb-1">
+          {logs.map((log, idx) => (
+            <div key={idx} className="flex gap-3 text-caption leading-snug">
+              <span className="text-muted shrink-0 text-data">{log.timestamp.slice(0, 8)}</span>
+              <span className={typeColor[log.type] || "text-secondary"}>{log.text}</span>
+            </div>
+          ))}
+          <div className="flex gap-3 text-caption leading-snug">
+            <span className="text-muted shrink-0 text-data">{(clockTime || "--:--:--").slice(0, 8)}</span>
+            <span className="w-1.5 h-3.5 bg-accent anim-blink" />
+          </div>
+        </div>
+      </div>
+    </Panel>
   );
 }

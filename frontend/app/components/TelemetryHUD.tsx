@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { HoveredCoords } from "../types";
-import { Layers, Map, Target, Shield, Activity, Grid, Waves, Network } from "lucide-react";
+import { Layers } from "lucide-react";
+import { Panel, Toggle, Button } from "../ui";
 
 interface TelemetryHUDProps {
   hoveredCoords: HoveredCoords;
@@ -14,10 +15,13 @@ interface TelemetryHUDProps {
     threats: boolean;
     tacticalZones: boolean;
     hydrology: boolean;
+    effects: boolean;
   };
   onToggleLayer: (key: keyof TelemetryHUDProps["mapLayers"]) => void;
   baseMapType: "standard" | "satellite" | "topo";
   onSetBaseMapType: (type: "standard" | "satellite" | "topo") => void;
+  sceneMode: "3d" | "2d";
+  onSetSceneMode: (mode: "3d" | "2d") => void;
 }
 
 export function TelemetryHUD({
@@ -25,225 +29,151 @@ export function TelemetryHUD({
   mapLayers,
   onToggleLayer,
   baseMapType,
-  onSetBaseMapType
+  onSetBaseMapType,
+  sceneMode,
+  onSetSceneMode
 }: TelemetryHUDProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Esc closes the popover
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen]);
+
+  // Outside-click closes the popover (ignore clicks on the trigger itself)
+  useEffect(() => {
+    if (!isOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (popoverRef.current?.contains(t)) return;
+      if (triggerRef.current?.contains(t)) return;
+      setIsOpen(false);
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [isOpen]);
 
   return (
     <>
-      {/* Floating popover for layer selection - Rendered outside footer to prevent clip-path cutting */}
       {isOpen && (
-        <div 
-          style={{ bottom: "60px", left: "calc(50% + 100px)", position: "fixed" }}
-          className="theme-bg-panel border theme-border p-3 rounded-lg shadow-xl w-64 flex flex-col gap-1.5 z-55 pointer-events-auto animate-fadeIn"
+        <div
+          ref={popoverRef}
+          className="fixed left-1/2 -translate-x-1/2 z-50"
+          style={{ bottom: "68px" }}
         >
-          {/* Popover Header */}
-          <div className="text-[9px] theme-text-primary font-bold font-rajdhani tracking-wider border-b theme-border pb-1.5 flex items-center gap-1.5">
-            <Activity className="w-3 h-3 theme-neon-text animate-pulse" />
-            <span>STW_GRID: WARSTWY TAKTYCZNE</span>
-          </div>
+          <div className="anim-slide-up">
+            <Panel variant="floating" rounded="xl" className="w-72 flex flex-col overflow-hidden">
+              <div className="flex flex-col px-4 pt-3 pb-2">
+                <span className="text-micro text-muted">HUD</span>
+                <span className="text-heading text-primary">Warstwy mapy</span>
+              </div>
 
-          {/* Base Map Toggle */}
-          <button
-            onClick={() => onToggleLayer("baseMap")}
-            className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded theme-bg-button hover:theme-bg-button-hover transition-all cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-2">
-              <Map className={`w-3.5 h-3.5 ${mapLayers.baseMap ? "theme-neon-text" : "theme-text-muted"}`} />
-              <span className={mapLayers.baseMap ? "theme-text-primary font-bold" : "theme-text-muted"}>Podkład Satelitarny</span>
-            </div>
-            <div className={`w-6 h-3 rounded-full border relative transition-all duration-250 ${
-              mapLayers.baseMap ? "bg-cyan-500/20 border-cyan-500" : "theme-bg-app theme-border"
-            }`}>
-              <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full transition-all duration-250 ${
-                mapLayers.baseMap ? "right-0.5 bg-cyan-500" : "left-0.5 theme-bg-muted"
-              }`} />
-            </div>
-          </button>
+              <div className="flex flex-col px-2 pb-2">
+                <Toggle checked={mapLayers.nodes}     onChange={() => onToggleLayer("nodes")}     label="Obiekty krytyczne" />
+                <Toggle checked={mapLayers.domes}     onChange={() => onToggleLayer("domes")}     label="Kopuły obronne" />
+                <Toggle checked={mapLayers.threats}   onChange={() => onToggleLayer("threats")}   label="Wektory zagrożeń" tone="error" />
+                <Toggle checked={mapLayers.relations} onChange={() => onToggleLayer("relations")} label="Powiązania węzłów" />
+                <Toggle checked={mapLayers.hydrology} onChange={() => onToggleLayer("hydrology")} label="Hydrologia" />
+              </div>
 
-          {/* Strategic Nodes Toggle */}
-          <button
-            onClick={() => onToggleLayer("nodes")}
-            className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded theme-bg-button hover:theme-bg-button-hover transition-all cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-2">
-              <Target className={`w-3.5 h-3.5 ${mapLayers.nodes ? "theme-neon-text" : "theme-text-muted"}`} />
-              <span className={mapLayers.nodes ? "theme-text-primary font-bold" : "theme-text-muted"}>Węzły Strategiczne</span>
-            </div>
-            <div className={`w-6 h-3 rounded-full border relative transition-all duration-250 ${
-              mapLayers.nodes ? "bg-cyan-500/20 border-cyan-500" : "theme-bg-app theme-border"
-            }`}>
-              <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full transition-all duration-250 ${
-                mapLayers.nodes ? "right-0.5 bg-cyan-500" : "left-0.5 theme-bg-muted"
-              }`} />
-            </div>
-          </button>
+              <div className="flex flex-col px-2 pb-2 pt-2 border-t border-subtle">
+                <div className="px-2 pt-1 pb-1.5 text-micro text-muted">Efekty bojowe</div>
+                <Toggle checked={mapLayers.effects} onChange={() => onToggleLayer("effects")} label="Wybuchy i dym 3D" tone="error" />
+              </div>
 
-          {/* Node Relations Toggle */}
-          <button
-            onClick={() => onToggleLayer("relations")}
-            className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded theme-bg-button hover:theme-bg-button-hover transition-all cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-2">
-              <Network className={`w-3.5 h-3.5 ${mapLayers.relations ? "theme-neon-text" : "theme-text-muted"}`} />
-              <span className={mapLayers.relations ? "theme-text-primary font-bold" : "theme-text-muted"}>Powiązania Węzłów</span>
-            </div>
-            <div className={`w-6 h-3 rounded-full border relative transition-all duration-250 ${
-              mapLayers.relations ? "bg-cyan-500/20 border-cyan-500" : "theme-bg-app theme-border"
-            }`}>
-              <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full transition-all duration-250 ${
-                mapLayers.relations ? "right-0.5 bg-cyan-500" : "left-0.5 theme-bg-muted"
-              }`} />
-            </div>
-          </button>
+              <div className="px-4 pb-2 pt-2 border-t border-subtle">
+                <div className="text-micro text-muted mb-1.5">Widok</div>
+                <div className="grid grid-cols-2 gap-0.5 p-0.5 bg-surface-data rounded-(--r-md)">
+                  {(["3d", "2d"] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => onSetSceneMode(m)}
+                      className={[
+                        "py-1.5 text-caption rounded-(--r-sm) cursor-pointer transition-colors",
+                        sceneMode === m
+                          ? "bg-surface-1 text-primary font-medium"
+                          : "text-muted hover:text-secondary"
+                      ].join(" ")}
+                    >
+                      {m === "3d" ? "3D · Cesium" : "2D · płaska mapa"}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          {/* Defense Domes Toggle */}
-          <button
-            onClick={() => onToggleLayer("domes")}
-            className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded theme-bg-button hover:theme-bg-button-hover transition-all cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-2">
-              <Shield className={`w-3.5 h-3.5 ${mapLayers.domes ? "theme-neon-text" : "theme-text-muted"}`} />
-              <span className={mapLayers.domes ? "theme-text-primary font-bold" : "theme-text-muted"}>Kopuły Ochronne</span>
-            </div>
-            <div className={`w-6 h-3 rounded-full border relative transition-all duration-250 ${
-              mapLayers.domes ? "bg-cyan-500/20 border-cyan-500" : "theme-bg-app theme-border"
-            }`}>
-              <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full transition-all duration-250 ${
-                mapLayers.domes ? "right-0.5 bg-cyan-500" : "left-0.5 theme-bg-muted"
-              }`} />
-            </div>
-          </button>
-
-          {/* Threat Vectors Toggle */}
-          <button
-            onClick={() => onToggleLayer("threats")}
-            className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded theme-bg-button hover:theme-bg-button-hover transition-all cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-2">
-              <Activity className={`w-3.5 h-3.5 ${mapLayers.threats ? "text-red-500" : "theme-text-muted"}`} />
-              <span className={mapLayers.threats ? "theme-text-primary font-bold" : "theme-text-muted"}>Wektory Zagrożeń</span>
-            </div>
-            <div className={`w-6 h-3 rounded-full border relative transition-all duration-250 ${
-              mapLayers.threats ? "bg-red-500/20 border-red-500" : "theme-bg-app theme-border"
-            }`}>
-              <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full transition-all duration-250 ${
-                mapLayers.threats ? "right-0.5 bg-red-500" : "left-0.5 theme-bg-muted"
-              }`} />
-            </div>
-          </button>
-
-          {/* Tactical Zones & Grid Toggle */}
-          <button
-            onClick={() => onToggleLayer("tacticalZones")}
-            className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded theme-bg-button hover:theme-bg-button-hover transition-all cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-2">
-              <Grid className={`w-3.5 h-3.5 ${mapLayers.tacticalZones ? "theme-neon-text" : "theme-text-muted"}`} />
-              <span className={mapLayers.tacticalZones ? "theme-text-primary font-bold" : "theme-text-muted"}>Siatka i Strefy</span>
-            </div>
-            <div className={`w-6 h-3 rounded-full border relative transition-all duration-250 ${
-              mapLayers.tacticalZones ? "bg-cyan-500/20 border-cyan-500" : "theme-bg-app theme-border"
-            }`}>
-              <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full transition-all duration-250 ${
-                mapLayers.tacticalZones ? "right-0.5 bg-cyan-500" : "left-0.5 theme-bg-muted"
-              }`} />
-            </div>
-          </button>
-
-          {/* Hydrology Toggle */}
-          <button
-            onClick={() => onToggleLayer("hydrology")}
-            className="flex justify-between items-center text-[10px] px-2 py-1.5 rounded theme-bg-button hover:theme-bg-button-hover transition-all cursor-pointer text-left"
-          >
-            <div className="flex items-center gap-2">
-              <Waves className={`w-3.5 h-3.5 ${mapLayers.hydrology ? "theme-neon-text" : "theme-text-muted"}`} />
-              <span className={mapLayers.hydrology ? "theme-text-primary font-bold" : "theme-text-muted"}>Rzeki i Hydrologia</span>
-            </div>
-            <div className={`w-6 h-3 rounded-full border relative transition-all duration-250 ${
-              mapLayers.hydrology ? "bg-cyan-500/20 border-cyan-500" : "theme-bg-app theme-border"
-            }`}>
-              <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full transition-all duration-250 ${
-                mapLayers.hydrology ? "right-0.5 bg-cyan-500" : "left-0.5 theme-bg-muted"
-              }`} />
-            </div>
-          </button>
-          {/* Base Map Style Selector */}
-          <div className="border-t theme-border pt-2.5 mt-1 space-y-1.5">
-            <span className="text-[8px] theme-text-muted font-bold font-rajdhani tracking-wider block">STYL PODKŁADU MAPY</span>
-            <div className="grid grid-cols-3 gap-1 theme-bg-app p-0.5 rounded border theme-border">
-              <button
-                onClick={() => onSetBaseMapType("standard")}
-                className={`py-1 text-[8px] font-bold tracking-wider rounded transition-all cursor-pointer text-center ${
-                  baseMapType === "standard"
-                    ? "bg-cyan-500/20 theme-neon-text border border-cyan-500/30"
-                    : "theme-text-muted hover:theme-text-primary border border-transparent"
-                }`}
-              >
-                STANDARD
-              </button>
-              <button
-                onClick={() => onSetBaseMapType("satellite")}
-                className={`py-1 text-[8px] font-bold tracking-wider rounded transition-all cursor-pointer text-center ${
-                  baseMapType === "satellite"
-                    ? "bg-cyan-500/20 theme-neon-text border border-cyan-500/30"
-                    : "theme-text-muted hover:theme-text-primary border border-transparent"
-                }`}
-              >
-                SATELITA
-              </button>
-              <button
-                onClick={() => onSetBaseMapType("topo")}
-                className={`py-1 text-[8px] font-bold tracking-wider rounded transition-all cursor-pointer text-center ${
-                  baseMapType === "topo"
-                    ? "bg-cyan-500/20 theme-neon-text border border-cyan-500/30"
-                    : "theme-text-muted hover:theme-text-primary border border-transparent"
-                }`}
-              >
-                TOPO
-              </button>
-            </div>
+              {/* Podkład selector is meaningful only in 2D — the 3D scene is covered
+                  by the Google photoreal mesh, which hides whatever basemap sits on
+                  the globe underneath. Showing it in 3D would be a dead control. */}
+              {sceneMode === "2d" && (
+                <div className="px-4 pb-3 pt-2">
+                  <div className="text-micro text-muted mb-1.5">Podkład</div>
+                  <div className="grid grid-cols-3 gap-0.5 p-0.5 bg-surface-data rounded-(--r-md)">
+                    {(["standard", "satellite", "topo"] as const).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => onSetBaseMapType(t)}
+                        className={[
+                          "py-1.5 text-caption rounded-(--r-sm) cursor-pointer transition-colors",
+                          baseMapType === t
+                            ? "bg-surface-1 text-primary font-medium"
+                            : "text-muted hover:text-secondary"
+                        ].join(" ")}
+                      >
+                        {t === "standard" ? "Mapa" : t === "satellite" ? "Satelita" : "Topo"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Panel>
           </div>
         </div>
       )}
 
-      <footer 
-        style={{ bottom: "16px", left: "50%", transform: "translateX(-50%)", position: "fixed" }}
-        className="z-50 px-6 py-2 theme-bg-panel border theme-border flex gap-6 text-[10px] font-mono shadow-2xl backdrop-blur-md clip-chamfer theme-text-secondary items-center animate-fadeIn"
-      >
-        <div className="flex flex-col">
-          <span className="theme-text-muted text-[8px] font-bold font-rajdhani tracking-wider">CESIUM COORDINATES</span>
-          <span className="theme-neon-text font-bold tabular-nums">
-            {hoveredCoords.lat.toFixed(6)}° N / {hoveredCoords.lon.toFixed(6)}° E
+      <footer className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center h-10 bg-surface-2 elev-2 rounded-(--r-pill) overflow-hidden anim-fade-in pl-1 pr-1">
+        <div className="flex items-center gap-2 pl-4 pr-3.5 h-full">
+          <span className="text-micro text-muted">GPS</span>
+          <span className="text-data text-primary">
+            {hoveredCoords.lat.toFixed(4)}°N · {hoveredCoords.lon.toFixed(4)}°E
           </span>
         </div>
-        <div className="flex flex-col border-l theme-border pl-6">
-          <span className="theme-text-muted text-[8px] font-bold font-rajdhani tracking-wider">ALTITUDE (EYE)</span>
-          <span className="theme-text-primary font-sharetech font-semibold tabular-nums">{hoveredCoords.alt} m</span>
+
+        <div className="w-px h-5 bg-(--border-subtle)" />
+
+        <div className="flex items-center gap-2 px-3.5 h-full">
+          <span className="text-micro text-muted">ALT</span>
+          <span className="text-data text-primary">{hoveredCoords.alt} m</span>
         </div>
-        <div className="flex flex-col border-l theme-border pl-6">
-          <span className="theme-text-muted text-[8px] font-bold font-rajdhani tracking-wider">AZIMUTH (CAMERA)</span>
-          <span className="theme-text-primary font-sharetech font-semibold tabular-nums">{hoveredCoords.az}°</span>
+
+        <div className="w-px h-5 bg-(--border-subtle)" />
+
+        <div className="flex items-center gap-2 pl-3.5 pr-4 h-full">
+          <span className="text-micro text-muted">AZ</span>
+          <span className="text-data text-primary">{hoveredCoords.az}°</span>
         </div>
-        <div className="flex flex-col border-l theme-border pl-6">
-          <span className="theme-text-muted text-[8px] font-bold font-rajdhani tracking-wider">TACTICAL SCALE</span>
-          <span className="text-emerald-600 dark:text-emerald-450 font-bold font-rajdhani">B2G / STALOWA WOLA DIGITAL TWIN</span>
-        </div>
-        
-        {/* Interactive GIS Layers Toggle Segment */}
-        <div className="flex items-center border-l theme-border pl-6">
-          <button
+
+        <div className="w-px h-5 bg-(--border-subtle)" />
+
+        <div className="pl-1.5 pr-0.5">
+          <Button
+            ref={triggerRef}
+            variant="ghost"
+            size="sm"
+            icon={<Layers />}
+            active={isOpen}
             onClick={() => setIsOpen(!isOpen)}
-            className={`p-1 px-2.5 rounded border transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              isOpen 
-                ? "theme-neon-text theme-neon-border theme-bg-panel-hover" 
-                : "theme-text-muted theme-border hover:theme-text-primary hover:theme-bg-panel-hover"
-            }`}
-            title="Zarządzaj warstwami mapy"
+            aria-expanded={isOpen}
+            aria-haspopup="dialog"
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span className="text-[9px] font-bold font-rajdhani tracking-wider">WARSTWY</span>
-          </button>
+            Warstwy
+          </Button>
         </div>
       </footer>
     </>

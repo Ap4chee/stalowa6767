@@ -1,8 +1,9 @@
 "use client";
 
 import { CriticalNode, NodeRelation } from "../types";
-import { CollapsibleCard } from "./CollapsibleCard";
+import { Panel, StatusPill } from "../ui";
 import { NodeList } from "./NodeList";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface LeftSidebarProps {
   nodes: CriticalNode[];
@@ -12,6 +13,9 @@ interface LeftSidebarProps {
   onAddRelation: (rel: NodeRelation) => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  selectedNodeId?: string | null;
+  hoveredNodeId?: string | null;
+  onHoverNode?: (id: string | null) => void;
 }
 
 export function LeftSidebar({
@@ -21,36 +25,62 @@ export function LeftSidebar({
   onAddNode,
   onAddRelation,
   isCollapsed,
-  onToggle
+  onToggle,
+  selectedNodeId,
+  hoveredNodeId,
+  onHoverNode
 }: LeftSidebarProps) {
+  const operational = nodes.filter(n => n.status === "OPERATIONAL").length;
+  const degraded    = nodes.filter(n => n.status === "DEGRADED").length;
+  const destroyed   = nodes.filter(n => n.status === "DESTROYED").length;
+
   return (
-    <div className={`w-full theme-bg-panel border theme-border clip-chamfer text-[11px] shadow-2xl backdrop-blur-md transition-all duration-300 ${
-      isCollapsed ? "flex-initial" : "flex-1 min-h-0 flex flex-col"
-    }`}>
-      <CollapsibleCard
-        title="PANEL DOWODZENIA"
-        isCollapsed={isCollapsed}
-        onToggle={onToggle}
-        className="flex-1 min-h-0 flex flex-col"
-        contentClassName="flex-1 min-h-0 flex flex-col"
-        badge={
-          <span className="text-[8px] theme-text-muted font-bold">
-            {nodes.filter(n => n.status === "OPERATIONAL").length}/{String(nodes.length).padStart(2, '0')} WĘZŁÓW
-          </span>
-        }
-        headerClassName="px-3 py-2 border-b theme-border theme-neon-text hover:theme-bg-panel-hover"
-        fixedHeight={isCollapsed ? 0 : undefined}
-      >
-        <div className="p-3 overflow-y-auto terminal-scroll flex-1 min-h-0">
+    <Panel
+      variant="floating"
+      rounded="xl"
+      className={`flex flex-col min-h-0 overflow-hidden transition-[width] duration-(--dur-base) ${
+        isCollapsed ? "w-14 flex-initial" : "w-full flex-1"
+      }`}
+    >
+      <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        {!isCollapsed && (
+          <div className="flex flex-col min-w-0">
+            <span className="text-micro text-muted">Lewy panel</span>
+            <span className="text-title text-primary truncate">Obiekty chronione</span>
+          </div>
+        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {!isCollapsed && (
+            <div className="flex items-center gap-1.5">
+              <StatusPill tone="ok" size="xs" dot>{operational}</StatusPill>
+              {degraded > 0 && <StatusPill tone="warn" size="xs" dot>{degraded}</StatusPill>}
+              {destroyed > 0 && <StatusPill tone="error" size="xs" dot pulse>{destroyed}</StatusPill>}
+            </div>
+          )}
+          <button
+            onClick={onToggle}
+            className="p-1.5 rounded-(--r-sm) text-muted hover:text-primary hover:bg-surface-hover cursor-pointer transition-colors"
+            title={isCollapsed ? "Rozwiń panel" : "Zwiń panel"}
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
+      {!isCollapsed && (
+        <div className="flex-1 min-h-0 overflow-hidden px-4 pb-4">
           <NodeList
             nodes={nodes}
             relations={relations}
             onNodeClick={onNodeClick}
             onAddNode={onAddNode}
             onAddRelation={onAddRelation}
+            selectedNodeId={selectedNodeId}
+            hoveredNodeId={hoveredNodeId}
+            onHoverNode={onHoverNode}
           />
         </div>
-      </CollapsibleCard>
-    </div>
+      )}
+    </Panel>
   );
 }

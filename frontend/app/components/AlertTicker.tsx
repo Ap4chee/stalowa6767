@@ -7,22 +7,34 @@ interface AlertTickerProps {
 }
 
 export function AlertTicker({ threats }: AlertTickerProps) {
-  const hasActiveThreats = threats.filter(t => t.status === "FLYING").length > 0;
+  const active = threats.filter(t => t.status === "FLYING").length;
+  const alarm = active > 0;
 
   return (
-    <div className="fixed top-12 left-0 w-full h-6 theme-bg-panel border-b theme-border z-[55] flex items-center font-mono backdrop-blur-md">
-      <div className="theme-bg-button px-3 h-full flex items-center text-[9px] theme-text-primary font-bold border-r theme-border font-rajdhani tracking-wider">
-        TACTICAL FEED
+    <div className="fixed top-19 left-3 right-3 z-55 h-9 flex items-center rounded-(--r-md) overflow-hidden bg-surface-1 elev-1">
+      {alarm && <span className="w-0.5 self-stretch bg-(--error)" />}
+      <div className="flex items-center gap-2 h-full px-4">
+        {alarm ? (
+          <>
+            <span className="w-1.5 h-1.5 rounded-full bg-(--error) anim-pulse" />
+            <span className="text-label text-error">
+              Alarm bojowy · {active} aktywne
+            </span>
+          </>
+        ) : (
+          <span className="text-label text-muted">Tactical feed</span>
+        )}
       </div>
+      <div className="w-px h-5 bg-(--border-subtle)" />
       <div className="ticker-wrap flex-1">
-        <div className="ticker text-[10px] theme-text-secondary py-1 font-sharetech select-none">
-          {hasActiveThreats ? (
-            <span className="text-red-500 animate-pulse font-bold">
-              ⚠️ ALARM BOJOWY: WYKRYTO ZBLIŻAJĄCE SIĘ POCISKI I DRONY NIEPRZYJACIELA !!! STREFA OBRONY PILICA PRZECHODZI W TRYB STRZELANIA OSTRĄ AMUNICJĄ...
+        <div className="ticker text-caption py-2 select-none text-primary">
+          {alarm ? (
+            <span>
+              Wykryto zbliżające się obiekty napowietrzne — system PSR-A PILICA przechodzi w tryb przechwytywania — jednostki defensywne aktywne — oczekiwanie na decyzję dowodzenia.
             </span>
           ) : (
-            <span>
-              SAT FEED: STALOWA WOLA NOMINALNA /// HUTA STALOWA WOLA S.A. SPRAWNA /// GPZ MAZIARNIA TRANZYTUJE PRĄD BEZ ZAKŁÓCEŃ /// MOST SAN DRĄŻONY RADARAMI /// CESIUM 3D TERRAIN RENDERER AKTYWNY
+            <span className="text-secondary">
+              Stalowa Wola nominalna — Huta HSW operacyjna — GPZ Maziarnia przesyła energię bez zakłóceń — Most San: monitoring radarowy ciągły — Cesium 3D terrain aktywny.
             </span>
           )}
         </div>

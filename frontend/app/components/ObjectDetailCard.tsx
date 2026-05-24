@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, BatteryCharging, ShieldAlert, Navigation, Settings2, Trash2, RotateCcw } from "lucide-react";
+import { X, BatteryCharging, Navigation as NavIcon, Settings2, Trash2, RotateCcw, AlertTriangle, Droplet, Flame } from "lucide-react";
 import { CriticalNode, DeployedSystem } from "../types";
 import { WEAPONS } from "../data/weapons";
+import { Panel, StatusPill, Button, HealthBar } from "../ui";
 
 interface ObjectDetailCardProps {
   selectedNode: CriticalNode | null;
@@ -23,29 +24,28 @@ interface ObjectDetailCardProps {
   isRelocationDragging?: boolean;
 }
 
-// Distance helper
-function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+const typeLabelPl: Record<CriticalNode["type"], string> = {
+  power: "Elektrownia",
+  water: "Ujęcie wody",
+  industrial: "Przemysł",
+  electrical: "Energetyka",
+  logistic: "Logistyka",
+  transit: "Tranzyt",
+  hq: "Sztab"
+};
+
+function statusTone(status: string): "ok" | "warn" | "error" {
+  if (status === "OPERATIONAL") return "ok";
+  if (status === "DEGRADED")   return "warn";
+  return "error";
 }
 
-// Relocation rate in seconds per kilometer
-function getRelocationRate(type: string) {
-  switch (type) {
-    case "PATRIOT": return 8;
-    case "PILICA": return 4;
-    case "RADAR": return 3;
-    default: return 2;
-  }
+function statusLabel(status: string): string {
+  if (status === "OPERATIONAL") return "Sprawny";
+  if (status === "DEGRADED")   return "Uszkodzony";
+  if (status === "DESTROYED")  return "Zniszczony";
+  if (status === "RELOCATING") return "W marszu";
+  return status;
 }
 
 export function ObjectDetailCard({
@@ -58,7 +58,6 @@ export function ObjectDetailCard({
   onResetCooling,
   onResetWater,
   onRemoveSystem,
-  onRelocateSystem,
   onFlyTo,
   leftSidebarCollapsed = false,
   onStartRelocationDrag,
@@ -70,61 +69,33 @@ export function ObjectDetailCard({
   const dragStartRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({ startX: 0, startY: 0, posX: 0, posY: 0 });
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Relocation states
-  const [isRelocatingFormOpen, setIsRelocatingFormOpen] = useState(false);
-  const [targetLat, setTargetLat] = useState("");
-  const [targetLon, setTargetLon] = useState("");
-
-  // Reset form when system changes
-  useEffect(() => {
-    if (selectedSystem) {
-      setIsRelocatingFormOpen(false);
-      setTargetLat(selectedSystem.lat.toFixed(4));
-      setTargetLon(selectedSystem.lon.toFixed(4));
-    }
-  }, [selectedSystem]);
-
-  // Load persisted position from localStorage if it exists
+  // Load persisted position
   useEffect(() => {
     try {
       const saved = localStorage.getItem("spaceshield_detail_card_pos");
-      if (saved) {
-        setPosition(JSON.parse(saved));
-      }
+      if (saved) setPosition(JSON.parse(saved));
     } catch (e) {
-      console.error("Failed to load position from localStorage", e);
+      console.error("Failed to load detail card position", e);
     }
   }, []);
 
-  // Sync position to localStorage
   const savePosition = (pos: { x: number; y: number } | null) => {
     setPosition(pos);
     try {
-      if (pos) {
-        localStorage.setItem("spaceshield_detail_card_pos", JSON.stringify(pos));
-      } else {
-        localStorage.removeItem("spaceshield_detail_card_pos");
-      }
+      if (pos) localStorage.setItem("spaceshield_detail_card_pos", JSON.stringify(pos));
+      else localStorage.removeItem("spaceshield_detail_card_pos");
     } catch (e) {
-      console.error("Failed to save position to localStorage", e);
+      console.error("Failed to save detail card position", e);
     }
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest("button") || target.closest("input") || target.closest("a") || target.closest("svg")) {
-      return;
-    }
-
+    if (target.closest("button") || target.closest("input") || target.closest("a") || target.closest("svg")) return;
     if (cardRef.current) {
       const rect = cardRef.current.getBoundingClientRect();
-      dragStartRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        posX: rect.left,
-        posY: rect.top
-      };
+      dragStartRef.current = { startX: e.clientX, startY: e.clientY, posX: rect.left, posY: rect.top };
       setIsDragging(true);
       e.preventDefault();
       target.setPointerCapture(e.pointerId);
@@ -133,88 +104,53 @@ export function ObjectDetailCard({
 
   useEffect(() => {
     if (!isDragging) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
+    const handleMove = (e: PointerEvent) => {
       const deltaX = e.clientX - dragStartRef.current.startX;
       const deltaY = e.clientY - dragStartRef.current.startY;
-      
-      let newX = dragStartRef.current.posX + deltaX;
-      let newY = dragStartRef.current.posY + deltaY;
-
-      const padding = 20;
+      const padding = 16;
       const cardWidth = 400;
-      
-      newX = Math.max(padding, Math.min(window.innerWidth - cardWidth - padding, newX));
-      newY = Math.max(padding, Math.min(window.innerHeight - 100, newY));
-
+      const newX = Math.max(padding, Math.min(window.innerWidth - cardWidth - padding, dragStartRef.current.posX + deltaX));
+      const newY = Math.max(padding, Math.min(window.innerHeight - 100, dragStartRef.current.posY + deltaY));
       setPosition({ x: newX, y: newY });
     };
-
-    const handlePointerUp = () => {
+    const handleUp = () => {
       setIsDragging(false);
       if (cardRef.current) {
         const rect = cardRef.current.getBoundingClientRect();
         savePosition({ x: rect.left, y: rect.top });
       }
     };
-
-    window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp);
-
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
     return () => {
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
     };
   }, [isDragging]);
 
+  // Click-outside dismiss: closes the card when user clicks anywhere outside it.
+  // Skipped during relocation drag because the user must click the map to set the target position.
+  useEffect(() => {
+    if (!selectedNode && !selectedSystem) return;
+    if (isRelocationDragging) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (!cardRef.current) return;
+      const target = e.target as Node;
+      if (cardRef.current.contains(target)) return;
+      // Defer to any open modal dialog (relocation confirmation, add node, etc.)
+      if (document.querySelector('[role="dialog"]')) return;
+      onClose();
+    };
+
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, [selectedNode, selectedSystem, isRelocationDragging, onClose]);
+
   if (!selectedNode && !selectedSystem) return null;
 
-  const handleBackupClick = () => {
-    if (selectedNode && !selectedNode.backupPower) {
-      onActivateBackupPower(selectedNode.id);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    if (status === "OPERATIONAL") return "text-emerald-700 dark:text-emerald-400 border-emerald-500/40 bg-emerald-500/10 dark:bg-emerald-950/10";
-    if (status === "DEGRADED") return "text-amber-700 dark:text-amber-400 border-amber-500/40 bg-amber-500/10 dark:bg-amber-950/10";
-    return "text-red-700 dark:text-red-400 border-red-500/40 bg-red-500/10 dark:bg-red-950/10";
-  };
-
-  // Live estimated distance and transfer time
-  const getRelocationEstimate = () => {
-    if (!selectedSystem) return null;
-    const latNum = parseFloat(targetLat);
-    const lonNum = parseFloat(targetLon);
-    if (isNaN(latNum) || isNaN(lonNum)) return null;
-
-    const distance = calculateDistanceKm(selectedSystem.lat, selectedSystem.lon, latNum, lonNum);
-    const rate = getRelocationRate(selectedSystem.type);
-    const seconds = Math.max(3, Math.round(distance * rate));
-    return {
-      distance: distance.toFixed(2),
-      seconds
-    };
-  };
-
-  const handleConfirmRelocation = () => {
-    if (!selectedSystem || !onRelocateSystem) return;
-    const latNum = parseFloat(targetLat);
-    const lonNum = parseFloat(targetLon);
-    if (isNaN(latNum) || isNaN(lonNum)) return;
-
-    const distance = calculateDistanceKm(selectedSystem.lat, selectedSystem.lon, latNum, lonNum);
-    const rate = getRelocationRate(selectedSystem.type);
-    const seconds = Math.max(3, Math.round(distance * rate));
-
-    onRelocateSystem(selectedSystem.id, latNum, lonNum, seconds);
-    setIsRelocatingFormOpen(false);
-  };
-
-  const est = getRelocationEstimate();
-
   return (
-    <div 
+    <div
       ref={cardRef}
       style={
         position
@@ -225,274 +161,265 @@ export function ObjectDetailCard({
             }
           : {}
       }
-      className={`fixed w-[400px] z-50 font-mono theme-bg-panel border theme-border p-4 clip-chamfer shadow-2xl backdrop-blur-md flex flex-col gap-3 ${
-        isDragging ? "select-none" : ""
-      } ${
-        position ? "" : `top-20 transition-all duration-300 ${leftSidebarCollapsed ? "left-6" : "left-[360px]"}`
-      }`}
+      className={`fixed w-[400px] z-50 ${
+        position ? "" : `top-32 transition-all duration-300 ${leftSidebarCollapsed ? "left-24" : "left-[22.5rem]"}`
+      } ${isDragging ? "select-none" : ""}`}
     >
-      
-      {/* Header */}
-      <div 
-        onPointerDown={handlePointerDown}
-        onDoubleClick={() => savePosition(null)}
-        className="flex justify-between items-start border-b theme-border pb-2 cursor-grab select-none active:cursor-grabbing"
-        title="Przeciągnij, aby przesunąć. Kliknij dwukrotnie, aby zresetować pozycję."
-      >
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] theme-neon-text/80 font-bold tracking-wider font-rajdhani">
-              {selectedNode ? "PROFIL STRATEGICZNEGO WĘZŁA" : "DETALE TARCZY BOJOWEJ"}
+      <Panel variant="floating" rounded="xl" className="flex flex-col overflow-hidden">
+        {/* Drag handle / header */}
+        <div
+          onPointerDown={handlePointerDown}
+          onDoubleClick={() => savePosition(null)}
+          className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 cursor-grab active:cursor-grabbing select-none"
+          title="Przeciągnij, aby przesunąć. Kliknij dwukrotnie, aby zresetować pozycję."
+        >
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-micro text-muted">
+              {selectedNode
+                ? `${selectedNode.id} · ${typeLabelPl[selectedNode.type]}`
+                : `${selectedSystem?.id} · System obronny`}
             </span>
-            <span className="text-[8px] theme-bg-app border theme-border px-1 py-0.5 theme-text-muted">
-              {selectedNode ? selectedNode.id : selectedSystem?.id}
-            </span>
+            <h3 className="text-title text-primary truncate mt-0.5">
+              {selectedNode ? selectedNode.name : selectedSystem?.name}
+            </h3>
           </div>
-          <h3 className="text-sm font-bold font-rajdhani theme-text-primary tracking-wide uppercase">
-            {selectedNode ? selectedNode.name : selectedSystem?.name}
-          </h3>
-        </div>
-        <div className="flex items-center gap-1">
-          {position && (
+          <div className="flex items-center gap-1 shrink-0">
+            {position && (
+              <button
+                onClick={() => savePosition(null)}
+                className="p-1.5 rounded-(--r-sm) text-muted hover:text-primary hover:bg-surface-hover cursor-pointer transition-colors"
+                title="Zresetuj pozycję"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button
-              onClick={() => savePosition(null)}
-              className="p-1 hover:theme-bg-panel-hover theme-text-muted hover:theme-text-primary rounded border border-transparent hover:theme-border transition-all cursor-pointer"
-              title="Zresetuj pozycję do domyślnej"
+              onClick={onClose}
+              className="p-1.5 rounded-(--r-sm) text-muted hover:text-primary hover:bg-surface-hover cursor-pointer transition-colors"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
-          )}
-          <button
-            onClick={onClose}
-            className="p-1 hover:theme-bg-panel-hover theme-text-muted hover:theme-text-primary rounded border border-transparent hover:theme-border transition-all cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          </div>
         </div>
-      </div>
 
-      {/* Render Node Details */}
-      {selectedNode && (
-        <div className="flex flex-col gap-3">
-          {/* Status & Coordinates */}
-          <div className="grid grid-cols-2 gap-2 text-[10px]">
-            <div className={`border p-2 flex flex-col gap-0.5 ${getStatusColor(selectedNode.status)}`}>
-              <span className="text-[8px] theme-text-muted">STATUS OPERACYJNY</span>
-              <span className="font-bold tracking-wider">{selectedNode.status}</span>
+        {/* NODE MODE */}
+        {selectedNode && (
+          <div className="flex flex-col gap-4 px-5 pb-5">
+            {/* Status row */}
+            <div className="flex items-center justify-between gap-3">
+              <StatusPill tone={statusTone(selectedNode.status)} size="sm" dot pulse={selectedNode.status !== "OPERATIONAL"}>
+                {statusLabel(selectedNode.status)}
+              </StatusPill>
+              <span className="text-data text-muted">
+                {selectedNode.lat.toFixed(4)}°N · {selectedNode.lon.toFixed(4)}°E
+              </span>
             </div>
-            <div className="border theme-border theme-bg-app p-2 flex flex-col gap-0.5 theme-text-primary">
-              <span className="text-[8px] theme-text-muted">POZYCJA GPS</span>
-              <span className="font-semibold">{selectedNode.lat.toFixed(5)}°N, {selectedNode.lon.toFixed(5)}°E</span>
-            </div>
-          </div>
 
-          {/* Health Bar */}
-          <div className="flex flex-col gap-1 text-[10px]">
-            <div className="flex justify-between items-center theme-text-secondary font-sharetech">
-              <span>STAN INTEGRALNOŚCI STRUKTURALNEJ</span>
-              <span className="font-bold">{selectedNode.health}%</span>
+            {/* Health */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-caption text-muted">Integralność strukturalna</span>
+                <span className="text-data text-primary">{Math.round(selectedNode.health)}%</span>
+              </div>
+              <HealthBar value={selectedNode.health} showValue={false} size="sm" />
             </div>
-            <div className="h-1.5 theme-bg-app border theme-border rounded-full overflow-hidden">
-              <div 
-                className={`h-full transition-all duration-500 ${
-                  selectedNode.health > 60 ? "bg-emerald-500" : selectedNode.health > 25 ? "bg-amber-500" : "bg-red-500"
-                }`}
-                style={{ width: `${selectedNode.health}%` }}
-              />
-            </div>
-          </div>
 
-          {/* Desc & Notes */}
-          <div className="text-[10px] space-y-1.5">
-            <div className="theme-bg-app p-2 border theme-border theme-text-secondary leading-normal">
+            {/* Description */}
+            <p className="text-body text-secondary leading-relaxed">
               {selectedNode.description}
-            </div>
-            {selectedNode.notes && (
-              <div className="bg-amber-500/10 dark:bg-amber-950/10 border border-amber-500/30 dark:border-amber-900/30 p-2 text-amber-700 dark:text-amber-400/90 leading-normal text-[9px]">
-                <span className="font-bold">KOMUNIKAT SYSTEMOWY:</span> {selectedNode.notes}
-              </div>
-            )}
-          </div>
-
-          {/* Cascading impact warning */}
-          <div className="border theme-border theme-bg-app p-2 flex flex-col gap-1 text-[10px]">
-            <div className="text-[8px] theme-text-muted font-bold flex items-center gap-1">
-              <ShieldAlert className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 font-bold" />
-              <span>MAPA ZALEŻNOŚCI KASKADOWYCH (ZAGROŻENIA)</span>
-            </div>
-            <p className="text-[9px] theme-text-secondary leading-tight">
-              {selectedNode.id === "OBJ_02" ? (
-                <>Zniszczenie odcina zasilanie do <span className="text-amber-700 dark:text-amber-400 font-bold">HSW (OBJ_01)</span> (redukcja do 15% mocy pieca) oraz zatrzymuje pompy w <span className="text-amber-700 dark:text-amber-400 font-bold">Ujęciu Wody (OBJ_03)</span>.</>
-              ) : selectedNode.id === "OBJ_03" ? (
-                <>Brak wody odcina chłodzenie bloku energetycznego w <span className="text-amber-700 dark:text-amber-400 font-bold">Elektrowni (OBJ_02)</span>, wyzwalając awaryjne wygaszenie turbiny.</>
-              ) : selectedNode.id === "OBJ_04" ? (
-                <>Utrata strefy energetycznej GPZ odcina zasilanie główne <span className="text-amber-700 dark:text-amber-400 font-bold">Centrum Zarządzania Kryzysowego (OBJ_07)</span>.</>
-              ) : (
-                <>Brak bezpośrednich krytycznych kaskad energetycznych dla innych węzłów.</>
-              )}
             </p>
-          </div>
 
-          {/* Actions panel */}
-          <div className="grid grid-cols-2 gap-2 mt-1">
-            <button
-              onClick={() => onFlyTo(selectedNode.lat, selectedNode.lon, selectedNode.name)}
-              className="py-2 border theme-border theme-bg-button hover:theme-bg-button-hover theme-text-primary hover:theme-neon-text transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Navigation className="w-3.5 h-3.5" />
-              NAMIERZ GPS
-            </button>
-
-            {/* Backup generator button */}
-            <button
-              onClick={handleBackupClick}
-              disabled={selectedNode.backupPower}
-              className={`py-2 border text-[11px] font-semibold font-rajdhani flex items-center justify-center gap-1.5 transition-all ${
-                selectedNode.backupPower
-                  ? "border-emerald-700 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 cursor-not-allowed"
-                  : "theme-border theme-bg-button hover:theme-bg-button-hover hover:border-amber-500 hover:theme-neon-text theme-text-primary cursor-pointer"
-              }`}
-            >
-              <BatteryCharging className="w-3.5 h-3.5" />
-              {selectedNode.backupPower ? "GENERATORY AKTYWNE" : "URUCHOM GENERATORY"}
-            </button>
-          </div>
-
-          {/* EMERGENCY TRIGGER BUTTONS */}
-          {selectedNode.id === "OBJ_02" && coolingSecondsLeft !== null && (
-            <div className="mt-1 bg-red-500/10 border border-red-500/40 p-2.5 flex flex-col gap-2 rounded animate-pulse">
-              <div className="flex justify-between items-center text-[10px] text-red-600 dark:text-red-400 font-bold">
-                <span>SEKWENCJA WYGASZANIA TURBINY AKTYWNA: {coolingSecondsLeft.toFixed(0)}s</span>
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+            {/* Notes */}
+            {selectedNode.notes && (
+              <div className="px-4 py-3 rounded-(--r-md) bg-warn-soft text-warn">
+                <span className="text-micro font-semibold block mb-0.5">Komunikat systemowy</span>
+                <span className="text-caption">{selectedNode.notes}</span>
               </div>
-              <button
-                onClick={onResetCooling}
-                className="w-full py-2 bg-red-600 dark:bg-red-950 border border-red-500 dark:border-red-650 hover:bg-red-700 dark:hover:bg-red-900 text-white dark:text-red-200 transition-all font-bold text-[11px] font-rajdhani flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Settings2 className="w-3.5 h-3.5" />
-                DODAJ CHŁODZIWO (RESTART SEK WYLĄCZENIA)
-              </button>
-            </div>
-          )}
+            )}
 
-          {selectedNode.id === "OBJ_03" && waterSecondsLeft !== null && (
-            <div className="mt-1 bg-red-500/10 border border-red-500/40 p-2.5 flex flex-col gap-2 rounded animate-pulse">
-              <div className="flex justify-between items-center text-[10px] text-red-600 dark:text-red-400 font-bold">
-                <span>DRENAŻ REZERW POMPOWYCH: {waterSecondsLeft.toFixed(0)}s</span>
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" />
+            {/* Cascading impact */}
+            <div className="px-4 py-3 rounded-(--r-md) bg-surface-data">
+              <span className="text-micro text-muted block mb-1">Wpływ kaskadowy</span>
+              <p className="text-caption text-secondary leading-snug">
+                {selectedNode.id === "OBJ_02" ? (
+                  <>Zniszczenie odcina zasilanie do <span className="text-warn font-medium">Huty (OBJ_01)</span> (redukcja do 15% mocy pieca) oraz zatrzymuje pompy w <span className="text-warn font-medium">Ujęciu Wody (OBJ_03)</span>.</>
+                ) : selectedNode.id === "OBJ_03" ? (
+                  <>Brak wody odcina chłodzenie bloku w <span className="text-warn font-medium">Elektrowni (OBJ_02)</span>, wyzwalając awaryjne wygaszenie turbiny.</>
+                ) : selectedNode.id === "OBJ_04" ? (
+                  <>Utrata GPZ odcina zasilanie główne <span className="text-warn font-medium">Centrum Zarządzania Kryzysowego (OBJ_07)</span>.</>
+                ) : (
+                  <>Brak bezpośrednich krytycznych kaskad energetycznych dla innych węzłów.</>
+                )}
+              </p>
+            </div>
+
+            {/* Cooling alert (OBJ_02) */}
+            {selectedNode.id === "OBJ_02" && coolingSecondsLeft !== null && (
+              <div className="px-4 py-3 rounded-(--r-md) bg-error-soft flex flex-col gap-2.5">
+                <div className="flex items-center gap-2 text-error">
+                  <Flame className="w-4 h-4 anim-pulse" />
+                  <span className="text-caption font-semibold flex-1">
+                    Wygaszanie turbiny: <span className="text-data">{coolingSecondsLeft.toFixed(0)}s</span>
+                  </span>
+                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  fullWidth
+                  icon={<Settings2 className="w-3.5 h-3.5" />}
+                  onClick={onResetCooling}
+                >
+                  Dodaj chłodziwo
+                </Button>
               </div>
-              <button
-                onClick={onResetWater}
-                className="w-full py-2 bg-red-600 dark:bg-red-950 border border-red-500 dark:border-red-650 hover:bg-red-700 dark:hover:bg-red-900 text-white dark:text-red-200 transition-all font-bold text-[11px] font-rajdhani flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Settings2 className="w-3.5 h-3.5" />
-                DOŁADUJ POMPY AWARYJNE (NAPEŁNIJ REZERWY)
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+            )}
 
-      {/* Render Deployed System Details */}
-      {selectedSystem && (
-        <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-2 text-[10px]">
-            <div className={`border p-2 flex flex-col gap-0.5 ${
-              selectedSystem.status === "RELOCATING"
-                ? "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400 animate-pulse"
-                : "border-cyan-500/40 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
-            }`}>
-              <span className="text-[8px] theme-text-muted">TRYB PRACY TARCZY</span>
-              <span className="font-bold tracking-wider font-mono">
-                {selectedSystem.status === "RELOCATING" 
-                  ? `MARSZ (${selectedSystem.relocationSecondsLeft}S)` 
-                  : "SKANOWANIE / AKTYWNY"}
+            {/* Water alert (OBJ_03) */}
+            {selectedNode.id === "OBJ_03" && waterSecondsLeft !== null && (
+              <div className="px-4 py-3 rounded-(--r-md) bg-error-soft flex flex-col gap-2.5">
+                <div className="flex items-center gap-2 text-error">
+                  <Droplet className="w-4 h-4 anim-pulse" />
+                  <span className="text-caption font-semibold flex-1">
+                    Drenaż pomp: <span className="text-data">{waterSecondsLeft.toFixed(0)}s</span>
+                  </span>
+                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  fullWidth
+                  icon={<Settings2 className="w-3.5 h-3.5" />}
+                  onClick={onResetWater}
+                >
+                  Doładuj pompy awaryjne
+                </Button>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<NavIcon className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  onFlyTo(selectedNode.lat, selectedNode.lon, selectedNode.name);
+                  onClose();
+                }}
+              >
+                Namierz GPS
+              </Button>
+              <Button
+                variant={selectedNode.backupPower ? "success" : "secondary"}
+                size="sm"
+                icon={<BatteryCharging className="w-3.5 h-3.5" />}
+                disabled={selectedNode.backupPower}
+                onClick={() => onActivateBackupPower(selectedNode.id)}
+              >
+                {selectedNode.backupPower ? "Generator aktywny" : "Uruchom generator"}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* SYSTEM MODE */}
+        {selectedSystem && (
+          <div className="flex flex-col gap-4 px-5 pb-5">
+            <div className="flex items-center justify-between gap-3">
+              <StatusPill
+                tone={selectedSystem.status === "RELOCATING" ? "warn" : "accent"}
+                size="sm"
+                dot
+                pulse={selectedSystem.status === "RELOCATING"}
+              >
+                {selectedSystem.status === "RELOCATING"
+                  ? `W marszu · ${selectedSystem.relocationSecondsLeft}s`
+                  : "Aktywny · skanowanie"}
+              </StatusPill>
+              <span className="text-data text-muted">
+                {selectedSystem.lat.toFixed(4)}°N · {selectedSystem.lon.toFixed(4)}°E
               </span>
             </div>
-            <div className="border theme-border theme-bg-app p-2 flex flex-col gap-0.5 theme-text-primary">
-              <span className="text-[8px] theme-text-muted">LOKACJA TARCZY</span>
-              <span className="font-semibold">{selectedSystem.lat.toFixed(5)}°N, {selectedSystem.lon.toFixed(5)}°E</span>
-            </div>
-          </div>
 
-          {selectedSystem.status === "RELOCATING" && (
-            <div className="bg-amber-500/10 border border-amber-500/30 p-2 text-[9px] text-amber-500 leading-normal animate-pulse flex flex-col gap-1">
-              <div>
-                <span className="font-bold">STATUS MARSZU:</span> Bateria jest w trakcie relokacji taktycznej. Wszystkie systemy bojowe są wyłączone do czasu dotarcia do celu.
+            {selectedSystem.status === "RELOCATING" && (
+              <div className="px-4 py-3 rounded-(--r-md) bg-warn-soft text-warn">
+                <span className="text-caption font-semibold block">Bateria w tranzycie</span>
+                <span className="text-caption block mt-0.5">
+                  Wszystkie systemy bojowe są wyłączone do czasu dotarcia.
+                </span>
+                <span className="text-micro text-warn/80 mt-1.5 italic block">
+                  Na potrzeby demo czas marszu skrócono do 5 s.
+                </span>
               </div>
-              <div className="text-[8px] text-amber-500/70 italic border-t border-amber-500/20 pt-1">
-                * Na potrzeby demo czas marszu skrócono do 5 sekund.
-              </div>
-            </div>
-          )}
+            )}
 
-          <div className="theme-bg-app p-3 border theme-border text-[10px] space-y-2 theme-text-secondary">
-            <div className="flex justify-between">
-              <span>Zasięg skuteczny:</span>
-              <span className="font-bold theme-text-primary">{selectedSystem.radius} metrów ({selectedSystem.radius / 1000} km)</span>
+            <div className="px-4 py-3 rounded-(--r-md) bg-surface-data flex flex-col gap-2">
+              <div className="flex justify-between text-caption">
+                <span className="text-muted">Zasięg skuteczny</span>
+                <span className="text-data text-primary">{selectedSystem.radius} m · {(selectedSystem.radius / 1000).toFixed(1)} km</span>
+              </div>
+              <div className="flex justify-between text-caption">
+                <span className="text-muted">Zwalczane cele</span>
+                <span className="text-primary">
+                  {WEAPONS.find(w => w.type === selectedSystem.type)?.threatsCovered.join(" · ")}
+                </span>
+              </div>
+              {selectedSystem.status === "RELOCATING" && selectedSystem.targetLat && selectedSystem.targetLon && (
+                <div className="flex justify-between text-caption pt-2 mt-1 border-t border-subtle text-warn">
+                  <span>Pozycja docelowa</span>
+                  <span className="text-data">{selectedSystem.targetLat.toFixed(4)}°N · {selectedSystem.targetLon.toFixed(4)}°E</span>
+                </div>
+              )}
             </div>
-            <div className="flex justify-between">
-              <span>Zwalczane cele:</span>
-              <span className="font-bold theme-text-primary">
-                {WEAPONS.find(w => w.type === selectedSystem.type)?.threatsCovered.join(", ")}
-              </span>
-            </div>
-            {selectedSystem.status === "RELOCATING" && selectedSystem.targetLat && selectedSystem.targetLon && (
-              <div className="flex justify-between border-t border-slate-700/30 pt-1 text-[9px] text-amber-500">
-                <span>Współrzędne docelowe:</span>
-                <span className="font-bold">{selectedSystem.targetLat.toFixed(4)}°N, {selectedSystem.targetLon.toFixed(4)}°E</span>
+
+            {!isRelocationDragging && selectedSystem.status !== "RELOCATING" && (
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <Button
+                  variant="secondary" size="sm"
+                  icon={<NavIcon className="w-3.5 h-3.5" />}
+                  onClick={() => {
+                    onFlyTo(selectedSystem.lat, selectedSystem.lon, selectedSystem.name);
+                    onClose();
+                  }}
+                >
+                  GPS
+                </Button>
+                <Button
+                  variant="secondary" size="sm"
+                  icon={<Settings2 className="w-3.5 h-3.5" />}
+                  onClick={() => onStartRelocationDrag && onStartRelocationDrag(selectedSystem.id)}
+                >
+                  Przemieść
+                </Button>
+                <Button
+                  variant="danger" size="sm"
+                  icon={<Trash2 className="w-3.5 h-3.5" />}
+                  onClick={() => onRemoveSystem(selectedSystem.id)}
+                >
+                  Demontuj
+                </Button>
+              </div>
+            )}
+
+            {isRelocationDragging && (
+              <div className="px-4 py-3 rounded-(--r-md) bg-warn-soft flex flex-col gap-2.5">
+                <div className="flex items-center gap-2 text-warn">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span className="text-caption font-semibold">Tryb wyznaczania pozycji</span>
+                </div>
+                <p className="text-caption text-secondary leading-snug">
+                  Przesuń kursor nad mapę, aby przesunąć duszek baterii. Kliknij lewy przycisk myszy w nowym miejscu, aby zatwierdzić rozkaz marszu.
+                </p>
+                <Button
+                  variant="ghost" size="sm" fullWidth
+                  onClick={() => onCancelRelocationDrag && onCancelRelocationDrag()}
+                >
+                  Anuluj wyznaczanie
+                </Button>
               </div>
             )}
           </div>
-
-          {/* Action buttons (only show if not relocating and dragging is not active) */}
-          {!isRelocationDragging && selectedSystem.status !== "RELOCATING" && (
-            <div className="grid grid-cols-3 gap-2 mt-1">
-              <button
-                onClick={() => onFlyTo(selectedSystem.lat, selectedSystem.lon, selectedSystem.name)}
-                className="py-2 border theme-border theme-bg-button hover:theme-bg-button-hover theme-text-primary hover:theme-neon-text transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <Navigation className="w-3.5 h-3.5" />
-                NAMIERZ GPS
-              </button>
-
-              <button
-                onClick={() => onStartRelocationDrag && onStartRelocationDrag(selectedSystem.id)}
-                className="py-2 border border-cyan-550/40 bg-cyan-500/5 text-cyan-400 hover:bg-cyan-550/20 hover:text-cyan-300 transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <Settings2 className="w-3.5 h-3.5" />
-                PRZEMIEŚĆ
-              </button>
-
-              <button
-                onClick={() => onRemoveSystem(selectedSystem.id)}
-                className="py-2 border border-red-500/60 dark:border-red-950/60 bg-red-500/10 dark:bg-red-950/10 hover:bg-red-650 dark:hover:bg-red-950 hover:text-white dark:hover:text-red-200 text-red-700 dark:text-red-400 transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                ZDEMONTUJ
-              </button>
-            </div>
-          )}
-
-          {/* Relocation Interactive Guide Panel */}
-          {isRelocationDragging && (
-            <div className="mt-1 pt-2.5 border-t border-amber-500/20 flex flex-col gap-2 bg-amber-500/5 p-2.5 rounded animate-pulse">
-              <span className="text-[8px] text-amber-500 font-bold uppercase tracking-wider">
-                TRYB WYZNACZANIA POZYCJI (DUSZEK 3D)
-              </span>
-              <p className="text-[9px] theme-text-secondary leading-tight">
-                Przesuń kursor myszy nad mapę, aby przesunąć <span className="text-amber-400 font-bold">"duszek"</span> oraz strefę zasięgu baterii. Następnie <span className="text-amber-400 font-bold">kliknij lewym przyciskiem myszy</span> w nowym miejscu, aby obliczyć czas marszu i wydać ostateczny rozkaz.
-              </p>
-              <button
-                onClick={() => onCancelRelocationDrag && onCancelRelocationDrag()}
-                className="w-full mt-1 py-1.5 border border-slate-650 bg-slate-500/10 hover:bg-slate-550/25 text-slate-400 transition-all font-semibold text-[10px] font-rajdhani clip-chamfer cursor-pointer flex items-center justify-center"
-              >
-                ANULUJ WYZNACZANIE
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </Panel>
     </div>
   );
 }

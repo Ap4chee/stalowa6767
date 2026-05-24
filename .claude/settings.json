@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /Users/wiktorstefaniak/.claude/projects/ 2>/dev/null)",
+      "Read(//Users/wiktorstefaniak/.claude/projects/**)",
+      "Bash(ls /Users/wiktorstefaniak/.claude/projects/-Users-wiktorstefaniak-Desktop-dev-stalowa6767/ 2>/dev/null && mkdir -p /Users/wiktorstefaniak/.claude/projects/-Users-wiktorstefaniak-Desktop-dev-stalowa6767/memory && ls /Users/wiktorstefaniak/.claude/projects/-Users-wiktorstefaniak-Desktop-dev-stalowa6767/memory/)"
+    ],
+    "additionalDirectories": [
+      "/Users/wiktorstefaniak/.claude/projects/-Users-wiktorstefaniak-Desktop-dev-stalowa6767"
+    ]
+  }
+}

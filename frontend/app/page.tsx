@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { CriticalNode, DeployedSystem, Threat, LogEntry, HoveredCoords, SidebarTab, WeaponType, SimState, NodeRelation } from "./types";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { CriticalNode, DeployedSystem, Threat, LogEntry, HoveredCoords, WeaponType, SimState, NodeRelation } from "./types";
 import { INITIAL_NODES, INITIAL_RELATIONS, CENTER_LAT, CENTER_LON } from "./data/nodes";
 import { WEAPONS } from "./data/weapons";
 import { THREAT_TYPES } from "./data/threats";
@@ -9,10 +9,12 @@ import { useAudio } from "./hooks/useAudio";
 import { useCascadingEngine } from "./hooks/useCascadingEngine";
 import { useDefcon } from "./hooks/useDefcon";
 import { useCesiumViewer } from "./hooks/useCesiumViewer";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { Header } from "./components/Header";
 import { AlertTicker } from "./components/AlertTicker";
 import { CesiumViewport } from "./components/CesiumViewport";
 import { LeftSidebar } from "./components/LeftSidebar";
+import { ScenariosPanel } from "./components/ScenariosPanel";
 import { ArsenalPanel } from "./components/ArsenalPanel";
 import { ThreatMonitor } from "./components/ThreatMonitor";
 import { CommandLogger } from "./components/CommandLogger";
@@ -21,6 +23,12 @@ import { ObjectDetailCard } from "./components/ObjectDetailCard";
 import { DependencyFlow } from "./components/DependencyFlow";
 import { ThreatModelViewer } from "./components/ThreatModelViewer";
 import { DefconOverlay } from "./components/DefconOverlay";
+import { StrategPanel } from "./components/StrategPanel";
+import { Coachmark } from "./ui/Coachmark";
+import { Button } from "./ui/Button";
+import { Dialog } from "./ui/Dialog";
+import type { TacticalSnapshot, Assessment } from "./strateg/schemas";
+import { captureCesiumScreenshot, drawStrategOverlays, clearStrategOverlays } from "./strateg/overlays";
 
 export default function SteelSentinelDashboard() {
   const [nodes, setNodes] = useState<CriticalNode[]>(INITIAL_NODES);
@@ -46,23 +54,33 @@ export default function SteelSentinelDashboard() {
 
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
-  const [radarCollapsed, setRadarCollapsed] = useState(false);
-  const [loggerCollapsed, setLoggerCollapsed] = useState(false);
+  const [radarCollapsed, setRadarCollapsed] = useState(true);
+  const [loggerCollapsed, setLoggerCollapsed] = useState(true);
   const [schemaModeEnabled, setSchemaModeEnabled] = useState(false);
   const [threatViewerOpen, setThreatViewerOpen] = useState(false);
+  const [strategOpen, setStrategOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [baseMapType, setBaseMapType] = useState<"standard" | "satellite" | "topo">("standard");
+  const [baseMapType, setBaseMapType] = useState<"standard" | "satellite" | "topo">("satellite");
+  const [sceneMode, setSceneMode] = useState<"3d" | "2d">("3d");
 
   useEffect(() => {
     const savedType = localStorage.getItem("steel-sentinel-basemap") as any;
     if (savedType === "standard" || savedType === "satellite" || savedType === "topo") {
       setBaseMapType(savedType);
     }
+    const savedScene = localStorage.getItem("steel-sentinel-scenemode");
+    if (savedScene === "2d" || savedScene === "3d") {
+      setSceneMode(savedScene);
+    }
   }, []);
 
   useEffect(() => {
     localStorage.setItem("steel-sentinel-basemap", baseMapType);
   }, [baseMapType]);
+
+  useEffect(() => {
+    localStorage.setItem("steel-sentinel-scenemode", sceneMode);
+  }, [sceneMode]);
   const [mapLayers, setMapLayers] = useState({
     baseMap: true,
     nodes: true,
@@ -70,7 +88,8 @@ export default function SteelSentinelDashboard() {
     domes: true,
     threats: true,
     tacticalZones: true,
-    hydrology: true
+    hydrology: true,
+    effects: true
   });
 
   const handleToggleLayer = useCallback((key: keyof typeof mapLayers) => {
@@ -99,9 +118,13 @@ export default function SteelSentinelDashboard() {
   }, [theme]);
 
   // Load nodes and relations from localStorage on client mount
+  // Bumped to v2 after node coordinates were re-anchored to real Stalowa Wola GPS
+  // (Tauron, HSW, Most Bora-Komorowskiego). Old v1 cache is discarded.
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const savedNodes = localStorage.getItem("sentinel_nodes");
+      localStorage.removeItem("sentinel_nodes");      // discard stale v1 cache
+      localStorage.removeItem("sentinel_relations");
+      const savedNodes = localStorage.getItem("sentinel_nodes_v2");
       if (savedNodes) {
         try {
           setNodes(JSON.parse(savedNodes));
@@ -109,7 +132,7 @@ export default function SteelSentinelDashboard() {
           console.error("Failed to parse saved nodes:", e);
         }
       }
-      const savedRelations = localStorage.getItem("sentinel_relations");
+      const savedRelations = localStorage.getItem("sentinel_relations_v2");
       if (savedRelations) {
         try {
           setRelations(JSON.parse(savedRelations));
@@ -123,19 +146,20 @@ export default function SteelSentinelDashboard() {
   // Save nodes to localStorage on update
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("sentinel_nodes", JSON.stringify(nodes));
+      localStorage.setItem("sentinel_nodes_v2", JSON.stringify(nodes));
     }
   }, [nodes]);
 
   // Save relations to localStorage on update
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("sentinel_relations", JSON.stringify(relations));
+      localStorage.setItem("sentinel_relations_v2", JSON.stringify(relations));
     }
   }, [relations]);
 
   const [selectedNode, setSelectedNode] = useState<CriticalNode | null>(null);
   const [selectedSystem, setSelectedSystem] = useState<DeployedSystem | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isRelocationDragging, setIsRelocationDragging] = useState(false);
   const [relocationConfirmation, setRelocationConfirmation] = useState<{
     sysId: string;
@@ -269,7 +293,10 @@ export default function SteelSentinelDashboard() {
     nodes,
     relations,
     baseMapType,
-    onConfirmRelocationPosition: handleConfirmRelocationPosition
+    sceneMode,
+    onConfirmRelocationPosition: handleConfirmRelocationPosition,
+    effectsEnabled: mapLayers.effects,
+    selectedWeapon
   });
 
   useEffect(() => {
@@ -536,6 +563,160 @@ export default function SteelSentinelDashboard() {
     ? deployedSystems.find(s => s.id === selectedSystem.id) || selectedSystem
     : null;
 
+  // -------------------- STRATEG AI integration --------------------
+  const buildStrategSnapshot = useCallback((): TacticalSnapshot => {
+    return {
+      city: { name: "Stalowa Wola", lat: CENTER_LAT, lon: CENTER_LON },
+      nodes: nodes.map(n => ({
+        id: n.id,
+        name: n.name,
+        type: n.type,
+        lat: n.lat,
+        lon: n.lon,
+        description: n.description,
+        health: n.health,
+        status: n.status,
+        backupPower: n.backupPower,
+        notes: n.notes
+      })),
+      relations: relations.map(r => ({ source: r.source, target: r.target, label: r.label })),
+      deployedSystems: deployedSystems.map(s => ({
+        id: s.id,
+        type: s.type,
+        name: s.name,
+        lat: s.lat,
+        lon: s.lon,
+        radius: s.radius,
+        status: s.status
+      })),
+      threats: threats.map(t => ({
+        id: t.id,
+        type: t.type,
+        name: t.name,
+        lat: t.lat,
+        lon: t.lon,
+        alt: t.alt,
+        targetId: t.targetId,
+        status: t.status
+      })),
+      notes: `DEFCON ${defcon}`
+    };
+  }, [nodes, relations, deployedSystems, threats, defcon]);
+
+  const captureStrategScreenshot = useCallback(async () => {
+    return captureCesiumScreenshot(viewerRef.current);
+  }, [viewerRef]);
+
+  const handleStrategDeploy = useCallback(
+    ({ type, lat, lon }: { type: WeaponType; lat: number; lon: number }) => {
+      const weapon = WEAPONS.find(w => w.type === type);
+      if (!weapon) return;
+      const newSys: DeployedSystem = {
+        id: `SYS_STR_${Date.now()}_${Math.floor(Math.random() * 100)}`,
+        type,
+        name: `${weapon.name} #${Math.floor(Math.random() * 1000)}`,
+        lat,
+        lon,
+        radius: weapon.range,
+        color: weapon.colorHex,
+        status: "OPERATIONAL"
+      };
+      setDeployedSystems(prev => [...prev, newSys]);
+      // Render on Cesium
+      setTimeout(() => drawDeployedSystem(newSys), 50);
+    },
+    [drawDeployedSystem]
+  );
+
+  const handleStrategDrawOverlays = useCallback((assessment: Assessment, currNodes: CriticalNode[]) => {
+    drawStrategOverlays(viewerRef.current, assessment.predictedVectors, assessment.vulnerabilities, currNodes);
+  }, [viewerRef]);
+
+  const handleStrategClearOverlays = useCallback(() => {
+    clearStrategOverlays(viewerRef.current);
+  }, [viewerRef]);
+
+  const handleStrategLaunchWave = useCallback(
+    (wave: { threatType?: "DRONE" | "SHAHED" | "MISSILE"; targetNodeId?: string }) => {
+      const threatType = wave.threatType;
+      const wantedId = wave.targetNodeId;
+      if (!threatType || !wantedId) {
+        addLog(
+          `STRATEG AI · RED TEAM: pomijam falę — niekompletne dane (type=${threatType ?? "?"}, target=${wantedId ?? "?"})`,
+          "error"
+        );
+        return;
+      }
+      // Tolerant resolver: exact → case-insensitive → fallback to first surviving node
+      let target = nodes.find(n => n.id === wantedId);
+      if (!target) {
+        target = nodes.find(n => n.id.toUpperCase() === wantedId.toUpperCase());
+      }
+      if (!target) {
+        const fallback = nodes.find(n => n.status !== "DESTROYED") || nodes[0];
+        if (!fallback) {
+          addLog(
+            `STRATEG AI · RED TEAM: brak węzłów na mapie — fala ${threatType} odrzucona.`,
+            "error"
+          );
+          return;
+        }
+        addLog(
+          `STRATEG AI · RED TEAM: węzeł ${wantedId} nie istnieje — przekierowuję falę ${threatType} na ${fallback.id}.`,
+          "warning"
+        );
+        spawnThreat(threatType, fallback.id);
+        return;
+      }
+      addLog(
+        `STRATEG AI · RED TEAM: fala spawnowana — ${threatType} → ${target.name}.`,
+        "combat"
+      );
+      // Force-resume sim — pause leaves freshly-spawned threats frozen mid-air.
+      setSimSpeed(s => (s === 0 ? 1 : s));
+      spawnThreat(threatType, target.id);
+    },
+    [spawnThreat, nodes, addLog]
+  );
+
+  // Global keyboard shortcuts
+  const shortcuts = useMemo(() => ({
+    "1": () => launchScenario(1),
+    "2": () => launchScenario(2),
+    "3": () => launchScenario(3),
+    "4": () => launchScenario(4),
+    "q": () => { setSelectedWeapon(w => w === "PILICA"  ? null : "PILICA");  addLog("PILICA — wskaż punkt na mapie.", "info"); },
+    "w": () => { setSelectedWeapon(w => w === "WRE"     ? null : "WRE");     addLog("WRE Jammer — wskaż punkt na mapie.", "info"); },
+    "e": () => { setSelectedWeapon(w => w === "RADAR"   ? null : "RADAR");   addLog("Radar — wskaż punkt na mapie.", "info"); },
+    "r": () => { setSelectedWeapon(w => w === "PATRIOT" ? null : "PATRIOT"); addLog("Patriot PAC-3 — wskaż punkt na mapie.", "info"); },
+    "space": (e: KeyboardEvent) => {
+      e.preventDefault();
+      setSimSpeed(s => s === 0 ? 1 : 0);
+    },
+    "escape": () => {
+      if (relocationConfirmation) {
+        setRelocationConfirmation(null);
+        setIsRelocationDragging(false);
+        cancelRelocationDrag();
+      } else if (isRelocationDragging) {
+        setIsRelocationDragging(false);
+        cancelRelocationDrag();
+      } else if (selectedWeapon) {
+        setSelectedWeapon(null);
+        addLog("Anulowano wybór systemu obronnego.", "info");
+      } else if (selectedNode || selectedSystem) {
+        setSelectedNode(null);
+        setSelectedSystem(null);
+      }
+    },
+    "shift+r": () => handleReset(),
+    "s": () => setSchemaModeEnabled(v => !v),
+    "m": () => setThreatViewerOpen(true),
+    "a": () => setStrategOpen(v => !v)
+  }), [launchScenario, addLog, relocationConfirmation, isRelocationDragging, cancelRelocationDrag, selectedWeapon, selectedNode, selectedSystem, handleReset]);
+
+  useKeyboardShortcuts(shortcuts);
+
   return (
     <div className="flex flex-col flex-1 h-screen relative select-none">
       <Header
@@ -562,12 +743,17 @@ export default function SteelSentinelDashboard() {
           setThreatViewerOpen(true);
           addLog("ROZPOZNANIE: Uruchomiono podgląd 3D modeli zagrożeń.", "info");
         }}
+        strategOpen={strategOpen}
+        onToggleStrateg={() => {
+          setStrategOpen(v => !v);
+          if (!strategOpen) addLog("STRATEG AI: Panel otwarty.", "info");
+        }}
       />
 
       <AlertTicker threats={threats} />
 
       {schemaModeEnabled && (
-        <div className="fixed top-[72px] bottom-0 left-0 right-0 z-20 theme-bg-app flex flex-col transition-all duration-500 ease-in-out">
+        <div className="fixed top-32 bottom-0 left-0 right-0 z-20 bg-canvas-gradient flex flex-col transition-all duration-500 ease-in-out">
           <DependencyFlow
             nodes={nodes}
             relations={relations}
@@ -596,10 +782,10 @@ export default function SteelSentinelDashboard() {
         isSplitScreen={schemaModeEnabled}
       />
 
-      {/* Unified Left Sidebar Column */}
+      {/* LEFT — obiekty chronione + monitor radarowy */}
       {!schemaModeEnabled && (
-        <div className="fixed left-4 top-20 bottom-4 w-80 z-40 flex flex-col gap-3 pointer-events-none">
-          <div className="pointer-events-auto flex flex-col gap-3 h-full min-h-0">
+        <div className="fixed left-3 top-32 bottom-24 w-80 z-40 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 h-full min-h-0">
             <LeftSidebar
               nodes={nodes}
               relations={relations}
@@ -608,61 +794,76 @@ export default function SteelSentinelDashboard() {
               onAddRelation={handleAddRelation}
               isCollapsed={leftPanelCollapsed}
               onToggle={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+              selectedNodeId={selectedNode?.id || null}
+              hoveredNodeId={hoveredNodeId}
+              onHoverNode={setHoveredNodeId}
             />
 
-            <ThreatMonitor
-              threats={threats}
-              nodes={nodes}
-              isCollapsed={radarCollapsed}
-              onToggle={() => setRadarCollapsed(!radarCollapsed)}
-            />
+            {threats.length > 0 && (
+              <ThreatMonitor
+                threats={threats}
+                nodes={nodes}
+                isCollapsed={radarCollapsed}
+                onToggle={() => setRadarCollapsed(!radarCollapsed)}
+              />
+            )}
           </div>
         </div>
       )}
 
-      {/* Unified Right Sidebar Column */}
+      {/* RIGHT — scenariusze (hero) + arsenał + konsola */}
       {!schemaModeEnabled && (
-        <div className="fixed right-4 top-20 bottom-4 w-80 z-40 flex flex-col gap-3 pointer-events-none">
-          <div className="pointer-events-auto flex flex-col gap-3 h-full min-h-0">
-            <ArsenalPanel
-              weapons={WEAPONS}
-              deployedSystems={deployedSystems}
-              selectedWeapon={selectedWeapon}
-              onSelectWeapon={(type) => {
-                setSelectedWeapon(type);
-                if (type) {
-                  addLog(`DOWÓDZTWO: Wybrano ${WEAPONS.find(w => w.type === type)?.name} do instalacji. Wskaż punkt na mapie 3D.`, "info");
-                }
-              }}
-              onLaunchScenario={launchScenario}
-              onReset={handleReset}
-              simSpeed={simSpeed}
-              onTogglePause={() => {
-                setSimSpeed(simSpeed === 0 ? 1 : 0);
-                addLog(`SYMULATOR: ${simSpeed === 0 ? "WZNOWIONY" : "WSTRZYMANY"}`, "info");
-              }}
-              onAddLog={addLog}
-              isCollapsed={rightPanelCollapsed}
-              onToggle={() => setRightPanelCollapsed(!rightPanelCollapsed)}
-            />
+        <div className="fixed right-3 top-32 bottom-24 w-80 z-40 flex flex-col">
+          <div className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto scroll-thin pr-1">
+            <div className="shrink-0">
+              <ScenariosPanel
+                threats={threats}
+                onLaunchScenario={launchScenario}
+                onReset={handleReset}
+                simSpeed={simSpeed}
+                onTogglePause={() => {
+                  setSimSpeed(simSpeed === 0 ? 1 : 0);
+                  addLog(`SYMULATOR: ${simSpeed === 0 ? "WZNOWIONY" : "WSTRZYMANY"}`, "info");
+                }}
+              />
+            </div>
 
-            <CommandLogger
-              logs={logs}
-              clockTime={clockTime}
-              isCollapsed={loggerCollapsed}
-              onToggle={() => setLoggerCollapsed(!loggerCollapsed)}
-            />
+            <div className="shrink-0">
+              <ArsenalPanel
+                weapons={WEAPONS}
+                deployedSystems={deployedSystems}
+                selectedWeapon={selectedWeapon}
+                onSelectWeapon={(type) => {
+                  setSelectedWeapon(type);
+                  if (type) {
+                    addLog(`Wybrano ${WEAPONS.find(w => w.type === type)?.name} — wskaż punkt na mapie 3D.`, "info");
+                  }
+                }}
+                onAddLog={addLog}
+              />
+            </div>
+
+            <div className="shrink-0">
+              <CommandLogger
+                logs={logs}
+                clockTime={clockTime}
+                isCollapsed={loggerCollapsed}
+                onToggle={() => setLoggerCollapsed(!loggerCollapsed)}
+              />
+            </div>
           </div>
         </div>
       )}
 
       {!schemaModeEnabled && (
-        <TelemetryHUD 
-          hoveredCoords={hoveredCoords} 
+        <TelemetryHUD
+          hoveredCoords={hoveredCoords}
           mapLayers={mapLayers}
           onToggleLayer={handleToggleLayer}
           baseMapType={baseMapType}
           onSetBaseMapType={setBaseMapType}
+          sceneMode={sceneMode}
+          onSetSceneMode={setSceneMode}
         />
       )}
 
@@ -697,58 +898,31 @@ export default function SteelSentinelDashboard() {
         }}
       />
 
-      {relocationConfirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm font-mono p-4">
-          <div className="w-[450px] theme-bg-panel border border-amber-500/50 p-5 clip-chamfer shadow-2xl flex flex-col gap-4">
-            <div className="flex justify-between items-center border-b border-amber-500/30 pb-2">
-              <span className="text-xs theme-neon-text font-bold tracking-wider font-rajdhani text-amber-500">
-                POTWIERDZENIE PRZEMIESZCZENIA BATERII
-              </span>
-              <span className="text-[10px] bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-amber-400 font-bold">
-                ROZKAZ MARSZU
-              </span>
-            </div>
-            
-            <p className="text-[11px] theme-text-primary leading-relaxed">
-              Czy chcesz zatwierdzić rozkaz dyslokacji jednostki{" "}
-              <span className="text-amber-400 font-bold uppercase">
-                {deployedSystems.find(s => s.id === relocationConfirmation.sysId)?.name}
-              </span>{" "}
-              na nową pozycję bojową?
-            </p>
-
-            <div className="grid grid-cols-2 gap-3 text-[10px] theme-bg-app p-3 border theme-border">
-              <div className="flex flex-col">
-                <span className="text-[8px] theme-text-muted">POZYCJA DOCELOWA</span>
-                <span className="font-bold theme-text-primary">
-                  {relocationConfirmation.lat.toFixed(5)}°N, {relocationConfirmation.lon.toFixed(5)}°E
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[8px] theme-text-muted">DYSTANS MARSZU</span>
-                <span className="font-bold theme-text-primary">
-                  {relocationConfirmation.distance.toFixed(2)} KM
-                </span>
-              </div>
-              <div className="flex flex-col mt-2 col-span-2 border-t theme-border pt-2">
-                <span className="text-[8px] theme-text-muted">SZACOWANY REALNY CZAS MARSZU KOLUMNY</span>
-                <span className="font-bold text-amber-400 text-xs font-sharetech">
-                  {relocationConfirmation.realTime}
-                </span>
-                <span className="text-[8px] text-slate-500 mt-1 italic block leading-snug">
-                  * Na potrzeby prezentacji (demo) czas przejazdu skrócono do 5 sekund.
-                </span>
-              </div>
-              <div className="flex flex-col mt-1 col-span-2">
-                <span className="text-[8px] theme-text-muted">STAN BATERII W TRANZYCIE</span>
-                <span className="font-bold text-red-500 text-[10px] uppercase">
-                  NIEAKTYWNY / WYŁĄCZONY Z SYS. OBRONY
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 mt-1">
-              <button
+      <Dialog
+        open={!!relocationConfirmation}
+        onClose={() => {
+          setIsRelocationDragging(false);
+          cancelRelocationDrag();
+          setRelocationConfirmation(null);
+        }}
+        eyebrow="Rozkaz marszu"
+        title="Potwierdź relokację baterii"
+        width="md"
+        footer={
+          relocationConfirmation && (
+            <>
+              <Button
+                variant="ghost" size="md"
+                onClick={() => {
+                  setIsRelocationDragging(false);
+                  cancelRelocationDrag();
+                  setRelocationConfirmation(null);
+                }}
+              >
+                Anuluj
+              </Button>
+              <Button
+                variant="primary" size="md"
                 onClick={() => {
                   handleRelocateSystem(
                     relocationConfirmation.sysId,
@@ -760,29 +934,86 @@ export default function SteelSentinelDashboard() {
                   cancelRelocationDrag();
                   setRelocationConfirmation(null);
                 }}
-                className="flex-1 py-2 border border-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-400 transition-all font-bold text-xs clip-chamfer cursor-pointer flex items-center justify-center gap-1.5"
               >
-                ZATWIERDŹ MARSZ
-              </button>
-              <button
-                onClick={() => {
-                  setIsRelocationDragging(false);
-                  cancelRelocationDrag();
-                  setRelocationConfirmation(null);
-                }}
-                className="flex-1 py-2 border border-slate-600 bg-slate-500/10 hover:bg-slate-550/25 text-slate-400 transition-all font-bold text-xs clip-chamfer cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                ANULUJ
-              </button>
+                Zatwierdź marsz
+              </Button>
+            </>
+          )
+        }
+      >
+        {relocationConfirmation && (
+          <div className="flex flex-col gap-4">
+            <p className="text-body text-secondary leading-relaxed">
+              Czy chcesz wydać rozkaz dyslokacji jednostki{" "}
+              <span className="text-primary font-medium">
+                {deployedSystems.find(s => s.id === relocationConfirmation.sysId)?.name}
+              </span>{" "}
+              na nową pozycję bojową?
+            </p>
+
+            <div className="px-4 py-3 rounded-(--r-md) bg-surface-data grid grid-cols-2 gap-3">
+              <div className="flex flex-col">
+                <span className="text-micro text-muted">Pozycja docelowa</span>
+                <span className="text-data text-primary">
+                  {relocationConfirmation.lat.toFixed(4)}°N · {relocationConfirmation.lon.toFixed(4)}°E
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-micro text-muted">Dystans marszu</span>
+                <span className="text-data text-primary">{relocationConfirmation.distance.toFixed(2)} km</span>
+              </div>
+              <div className="flex flex-col col-span-2 pt-3 mt-1 border-t border-subtle">
+                <span className="text-micro text-muted">Szacowany realny czas marszu kolumny</span>
+                <span className="text-heading text-warn mt-0.5">{relocationConfirmation.realTime}</span>
+                <span className="text-micro text-muted mt-1 italic">
+                  Na potrzeby demo czas przejazdu skrócono do 5 sekund.
+                </span>
+              </div>
+              <div className="flex items-center gap-2 col-span-2 pt-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-(--error) anim-pulse" />
+                <span className="text-caption text-error">
+                  Bateria nieaktywna w trakcie transferu.
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Dialog>
       <ThreatModelViewer
         isOpen={threatViewerOpen}
         onClose={() => setThreatViewerOpen(false)}
       />
       <DefconOverlay defcon={defcon} />
+
+      {/* STRATEG AI — vision-based defense architect (panel slides in from the right) */}
+      <StrategPanel
+        isOpen={strategOpen && !schemaModeEnabled}
+        onClose={() => setStrategOpen(false)}
+        nodes={nodes}
+        relations={relations}
+        deployedSystems={deployedSystems}
+        threats={threats}
+        buildSnapshot={buildStrategSnapshot}
+        captureScreenshot={captureStrategScreenshot}
+        onDeployRecommendation={handleStrategDeploy}
+        onLaunchRedTeamWave={handleStrategLaunchWave}
+        onDrawOverlays={handleStrategDrawOverlays}
+        onClearOverlays={handleStrategClearOverlays}
+        onAddLog={addLog}
+      />
+
+      {/* Pierwsze kroki — pokazuje się raz na sesję, znika gdy user cokolwiek zrobi */}
+      <Coachmark
+        storageKey="sentinel-coachmark-onboarding"
+        hideWhen={threats.length > 0 || deployedSystems.length > 0 || selectedNode !== null || selectedSystem !== null}
+        title="Wybierz akcję, aby uruchomić symulację"
+        steps={[
+          { num: 1, label: "Uruchom scenariusz ataku", hint: "Prawy panel · klawisze 1–4" },
+          { num: 2, label: "Postaw system obronny na mapie", hint: "Klawisze Q · W · E · R, potem klik" },
+          { num: 3, label: "Lub kliknij obiekt na mapie", hint: "Pojawi się karta szczegółów" }
+        ]}
+        footer="Esc anuluje wybór · Spacja pauzuje symulację · S — schemat sieci"
+      />
     </div>
   );
 }
