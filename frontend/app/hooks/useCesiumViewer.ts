@@ -60,6 +60,8 @@ export function useCesiumViewer({
   const threatEntitiesRef = useRef<{ [id: string]: any }>({});
   const laserLinesRef = useRef<any>(null);
   const [isCesiumLoaded, setIsCesiumLoaded] = useState(false);
+  const [isZoomedOut, setIsZoomedOut] = useState(false);
+  const clusterEntityRef = useRef<any>(null);
 
   // Layer groups refs to easily toggle visibility
   const nodeEntitiesGroupRef = useRef<any[]>([]);
@@ -265,6 +267,20 @@ export function useCesiumViewer({
         const pickedObject = viewer.scene.pick(click.position);
         if (Cesium.defined(pickedObject) && pickedObject.id) {
           const entityId = pickedObject.id.id;
+
+          // Check tactical cluster indicator click
+          if (entityId === "tactical_cluster_stalowa_wola") {
+            onAddLog("DOWÓDZTWO: Skupiono widok na zgrupowaniu obiektów Stalowa Wola", "info");
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat - 0.018, 4500),
+              orientation: {
+                heading: Cesium.Math.toRadians(15.0),
+                pitch: Cesium.Math.toRadians(-38.0),
+                roll: 0.0
+              }
+            });
+            return;
+          }
           
           // Check nodes
           const matchedNode = simStateRef.current.nodes.find((n: CriticalNode) => n.id === entityId);
@@ -952,6 +968,114 @@ export function useCesiumViewer({
       theme === "dark" ? "#020617" : "#f8fafc"
     );
   }, [theme, baseMapType, isCesiumLoaded]);
+
+  // 1. Camera Changed Listener to toggle isZoomedOut state
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const Cesium = (window as any).Cesium;
+    if (!viewer || !Cesium || !isCesiumLoaded) return;
+
+    const onCameraChanged = () => {
+      const height = viewer.camera.positionCartographic.height;
+      const zoomedOut = height > 28000; // 28 km threshold is perfect!
+      setIsZoomedOut(zoomedOut);
+    };
+
+    viewer.camera.changed.addEventListener(onCameraChanged);
+    return () => {
+      if (viewer && viewer.camera && viewer.camera.changed) {
+        viewer.camera.changed.removeEventListener(onCameraChanged);
+      }
+    };
+  }, [isCesiumLoaded]);
+
+  // 2. Reactively handle visibility of nodes, relations, weapons, and render the cluster indicator
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    const Cesium = (window as any).Cesium;
+    if (!viewer || !Cesium || !isCesiumLoaded) return;
+
+    // A. Toggle visibility of all Nodes (using nodeEntitiesGroupRef)
+    nodeEntitiesGroupRef.current.forEach((entity) => {
+      if (entity) {
+        entity.show = mapLayers.nodes && !isZoomedOut;
+      }
+    });
+
+    // B. Toggle visibility of all Relations (using relationEntitiesGroupRef)
+    relationEntitiesGroupRef.current.forEach((entity) => {
+      if (entity) {
+        entity.show = mapLayers.relations && !isZoomedOut;
+      }
+    });
+
+    // C. Toggle visibility of all Deployed Systems
+    const currentSystems = simStateRef.current.deployedSystems || [];
+    currentSystems.forEach((sys) => {
+      const ids = [sys.id, `${sys.id}_tower`, `${sys.id}_model`, `${sys.id}_beacon`, `${sys.id}_label`];
+      ids.forEach(id => {
+        const ent = viewer.entities.getById(id);
+        if (ent) {
+          ent.show = !isZoomedOut;
+        }
+      });
+      if (domeEntitiesRef.current[sys.id]) {
+        const ents = domeEntitiesRef.current[sys.id] as any;
+        if (Array.isArray(ents)) {
+          ents.forEach(ent => {
+            if (ent) ent.show = mapLayers.domes && !isZoomedOut;
+          });
+        } else if (ents) {
+          ents.show = mapLayers.domes && !isZoomedOut;
+        }
+      }
+    });
+
+    // D. Manage the Cluster Indicator Entity
+    if (isZoomedOut) {
+      const totalObjects = nodes.length + currentSystems.length;
+      
+      // If we don't have the cluster entity yet, create it!
+      if (!clusterEntityRef.current) {
+        const cluster = viewer.entities.add({
+          id: "tactical_cluster_stalowa_wola",
+          position: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, 500),
+          point: {
+            pixelSize: 26,
+            color: Cesium.Color.fromCssColorString("#06b6d4").withAlpha(0.25),
+            outlineColor: Cesium.Color.fromCssColorString("#06b6d4"),
+            outlineWidth: 3,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          },
+          label: {
+            text: `  OBIEKTY: ${totalObjects}  `,
+            font: "bold 11px 'JetBrains Mono', 'Segoe UI', Arial, sans-serif",
+            fillColor: Cesium.Color.WHITE,
+            style: Cesium.LabelStyle.FILL,
+            showBackground: true,
+            backgroundColor: Cesium.Color.fromCssColorString("#0f172a").withAlpha(0.9),
+            backgroundPadding: new Cesium.Cartesian2(10, 6),
+            scale: 1.0,
+            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            pixelOffset: new Cesium.Cartesian2(0, -22),
+            disableDepthTestDistance: Number.POSITIVE_INFINITY
+          }
+        });
+        clusterEntityRef.current = cluster;
+      } else {
+        // Update count dynamically
+        clusterEntityRef.current.label.text = `  OBIEKTY: ${totalObjects}  `;
+        clusterEntityRef.current.show = true;
+      }
+    } else {
+      // Hide cluster entity if not zoomed out
+      if (clusterEntityRef.current) {
+        clusterEntityRef.current.show = false;
+        viewer.entities.remove(clusterEntityRef.current);
+        clusterEntityRef.current = null;
+      }
+    }
+  }, [isZoomedOut, nodes, mapLayers.nodes, mapLayers.relations, mapLayers.domes, isCesiumLoaded]);
 
   return {
     viewerRef,

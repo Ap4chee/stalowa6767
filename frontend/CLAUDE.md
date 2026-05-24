@@ -1,450 +1,442 @@
-# Steel Sentinel — CLAUDE.md
+# STEEL SENTINEL — CLAUDE.md
+## Tactical Common Operational Picture (COP) — Command & Control Dashboard
 
-## Stack
+---
 
-| Technologia | Wersja | Uwagi |
+## ARCHITEKTURA APLIKACJI
+
+Aplikacja jest w pełni samodzielnym (zero backendu) dashboardem typu C2 (Command & Control) zbudowanym na Next.js 16 (App Router). Całość stanu zarządzana jest przez React `useState`, a dane są statyczne (hardcoded) z persystencją do `localStorage`. Nie ma API, WebSocketów ani bazy danych.
+
+### Stack technologiczny
+
+| Technologia | Wersja | Zastosowanie |
 |---|---|---|
-| Next.js | 16.2.6 App Router | Breaking changes — patrz `node_modules/next/dist/docs/` |
-| React | 19 | |
-| TypeScript | 5 (strict) | |
-| Tailwind CSS | 4 | `@import "tailwindcss"`, NOWA składnia — brak `@tailwind`/`tailwind.config` |
-| CesiumJS | 1.118 | CDN w layout.tsx — `(window as any).Cesium`, brak npm types |
-| Three.js | ^0.184 | W package.json ale zero importów w src — nie używać |
-| lucide-react | ^1.16 | Ikonki |
+| Next.js | 16.2.6 | Framework React (App Router) |
+| React | 19.2.4 | Biblioteka UI |
+| TypeScript | ^5 | Typowanie |
+| Tailwind CSS | ^4 | Utility-first CSS (składnia `@import "tailwindcss"`, brak `tailwind.config`) |
+| CesiumJS | 1.118 (CDN) | 3D globus GIS (ładowany z CDN w `layout.tsx`) |
+| @xyflow/react | 12.10.2 | Diagram przepływów (React Flow) |
+| @react-three/fiber | 9.6.1 | Renderer Three.js dla React |
+| @react-three/drei | 10.7.7 | Utility do Three.js (OrbitControls, GLTF, Environment) |
+| three | ^0.184.0 | Silnik 3D (zależność fiber/drei) |
+| lucide-react | ^1.16.0 | Ikony |
+| Google Fonts | — | Rajdhani, Share Tech Mono, JetBrains Mono (CDN) |
+
+### Persystencja (localStorage)
+
+| Klucz | Zawartość |
+|---|---|
+| `sentinel_nodes` | Tablica węzłów krytycznych (dodawanie/edycja węzłów) |
+| `sentinel_relations` | Tablica relacji między węzłami |
+| `sentinel_node_positions` | Pozycje węzłów w widoku DependencyFlow |
+| `spaceshield_detail_card_pos` | Pozycja okienka ObjectDetailCard |
+| `steel-sentinel-theme` | Motyw (`light` / `dark`) |
+| `steel-sentinel-basemap` | Typ podkładu mapy (`standard` / `satellite` / `topo`) |
 
 ---
 
-## Plik po pliku — kontekst
+## Typy (app/types/index.ts)
+
+- `CriticalNode` — węzeł infrastruktury krytycznej (id, name, lat, lon, type, health %, status, backupPower, notes)
+- `WeaponSystem` — definicja systemu obronnego (type, range, color, threatsCovered)
+- `DeployedSystem` — zainstalowany system na mapie (id, type, lat, lon, radius)
+- `ThreatType` — typ zagrożenia (speed, alt, immuneToWRE)
+- `Threat` — aktywne zagrożenie (position, targetId, pathType, progress, status, health)
+- `LogEntry` — wpis w konsoli zdarzeń (timestamp, text, type)
+- `HoveredCoords` — współrzędne pod kursorem (lat, lon, alt, az)
+- `NodeRelation` — relacja między węzłami (source, target, label)
+- `SimState` — snapshot całego stanu symulacji (dla refa)
+- Typy pomocnicze: `WeaponType`, `ThreatTypeName`, `NodeStatus`, `LogType`, `SidebarTab`
 
 ---
 
-### `layout.tsx` (root layout)
+## Dane statyczne (app/data/)
 
-Ładuje z CDN:
-- CesiumJS 1.118 (`Cesium.js` + `widgets.css`)
-- Google Fonts: Rajdhani (500,600,700), Share Tech Mono, JetBrains Mono
-
-Ustawia `<html>` i `<body>` z Tailwind klasami — ciemne tło, monospace font. Body ma `overflow-hidden` i `h-full`.
-
----
-
-### `globals.css`
-
-```css
-@import "tailwindcss";
-```
-Tailwind v4 — NOWA składnia. Brak `@tailwind base/components/utilities`.
-
-Custom klasy:
-- `.font-rajdhani` — Rajdhani sans-serif
-- `.font-sharetech` — Share Tech Mono
-- `.font-jetbrains` — JetBrains Mono
-- `.ticker-wrap` / `.ticker` — animacja przewijania tekstu (40s linear infinite, translateX)
-- `.terminal-scroll` — custom scrollbar (4px, slate-950 track, slate-800 thumb)
-- `.clip-chamfer` / `.clip-chamfer-lg` — military-style clipped corners (polygon clip-path)
-- `.reticle-crosshair` — tactical grid overlay (używany?)
-
-CSS vars: `--background: #020617`, `--foreground: #e2e8f0`.
-
----
-
-### `types/index.ts`
-
-Wszystkie interfejsy i aliasy:
-
-```typescript
-CriticalNode     — węzeł: id, name, lat/lon, type (industrial|power|water|electrical|logistic|transit|hq),
-                   health (0-100), status (OPERATIONAL|DEGRADED|DESTROYED), backupPower bool, notes
-WeaponSystem     — konfig broni: type (PILICA|WRE|RADAR), range (metry), color, threatsCovered[] 
-DeployedSystem   — zainstalowana broń: id, type, name, lat/lon, radius, color
-ThreatType       — template zagrożenia: speed, alt, immuneToWRE bool
-Threat           — aktywny wróg: id, type, startLat/Lon, lat/lon, alt, targetId, pathType (DIRECT|RIVER),
-                   progress 0-1, status (FLYING|JAMMED|INTERCEPTED|IMPACTED), health
-LogEntry          — timestamp, text, type (info|success|warning|error|combat)
-HoveredCoords     — lat, lon, alt, az (z kursora myszy)
-SimState          — snapshot dla pętli Cesium: { deployedSystems, threats, simSpeed, nodes, selectedWeapon }
-```
-
-Aliasy: `WeaponType`, `ThreatTypeName`, `NodeStatus`, `LogType`, `SidebarTab` (details|cascades|playbooks).
-
----
-
-### `data/nodes.ts`
-
-- `CENTER_LAT = 50.5630`, `CENTER_LON = 22.0490` — centrum Stalowej Woli
-- `INITIAL_NODES: CriticalNode[]` — 7 obiektów:
-  - OBJ_01: Huta Stalowa Wola (industrial)
-  - OBJ_02: Elektrownia (power) — zasila OBJ_01 i OBJ_03
-  - OBJ_03: Stacja Uzdatniania MZK (water) — chłodzi OBJ_02
-  - OBJ_04: GPZ Maziarnia (electrical) — zasila OBJ_07
-  - OBJ_05: Węzeł Kolejowy Rozwadów (logistic) — brak zależności
-  - OBJ_06: Most gen. Bora-Komorowskiego (transit) — brak zależności
+### nodes.ts
+- `CENTER_LAT` / `CENTER_LON` (50.5630, 22.0490) — centrum Stalowej Woli
+- `INITIAL_NODES` — 7 węzłów startowych (OBJ_01 do OBJ_07):
+  - OBJ_01: Huta Stalowa Wola S.A. (industrial)
+  - OBJ_02: Elektrownia Stalowa Wola (power)
+  - OBJ_03: Stacja Uzdatniania MZK (water)
+  - OBJ_04: GPZ "Maziarnia" (electrical)
+  - OBJ_05: Węzeł Kolejowy Rozwadów (logistic)
+  - OBJ_06: Most gen. Bora-Komorowskiego (transit)
   - OBJ_07: Centrum Zarządzania Kryzysowego (hq)
-- `NODE_COLORS: Record<string, string>` — hex kolory per type (np. industrial: "#0e7490")
+- `NODE_COLORS` — mapa kolorów dla każdego typu węzła
+- `INITIAL_RELATIONS` — 6 początkowych relacji (CHŁODZIWO, PALIWO, ZASILANIE, TELCO)
+
+### weapons.ts
+4 systemy obronne:
+- **PILICA** — VSHORAD (5km, zwalcza DRONE/SHAHED/MISSILE)
+- **WRE JAMMER** — walka radioelektroniczna (2km, tylko DRONE)
+- **RADAR** — radar dopplerowski (3.5km, tylko detekcja)
+- **PATRIOT PAC-3** — system dalekiego zasięgu (40km, SHAHED/MISSILE)
+
+### threats.ts
+3 typy zagrożeń:
+- **DRONE** — niski pułap (120m), podatny na WRE
+- **SHAHED** — amunicja krążąca (250m), odporny na WRE, path=RIVER
+- **MISSILE** — rakieta manewrująca (600m), odporny na WRE
+
+### river.ts
+`SAN_RIVER_COORDS` — 8 waypointów koryta Sanu (używane do renderowania rzeki i nawigacji Shahed)
 
 ---
 
-### `data/weapons.ts`
+## Hooki (app/hooks/)
 
-`WEAPONS: WeaponSystem[]` — 3 systemy:
+### useAudio.ts
+- Zwraca `{ playBeep }`
+- Tworzy `AudioContext` + `OscillatorNode` + `GainNode`
+- Parametry: frequency (Hz), waveform type (sine/sawtooth/triangle/square), duration
+- No-op gdy `soundEnabled === false`
+- Łapie wyjątki związane z autoplay blocking (try/catch)
 
-| System | Range | Kolor | Zwalcza |
-|---|---|---|---|
-| PILICA | 5000m | #ff4d4d (red) | DRONE, SHAHED, MISSILE |
-| WRE | 2000m | #3b82f6 (blue) | tylko DRONE |
-| RADAR | 3500m | #22c55e (green) | DRONE, SHAHED, MISSILE (tylko wizualny — nie interceptuje) |
+### useCascadingEngine.ts
+- 1-sekundowy `setInterval`
+- Główna pętla awarii kaskadowych:
+  - Elektrownia (OBJ_02) zniszczona/degradowana → Huta traci zasilanie (health spada do 15%) + Ujęcie wody traci pompy (drenaż rezerw 12h)
+  - Woda (OBJ_03) zniszczona → Elektrownia traci chłodzenie (6-sekundowe wygaszanie turbiny)  
+  - GPZ Maziarnia (OBJ_04) zniszczony → Centrum Kryzysowe (OBJ_07) spada do 40% health
+  - Aktualizuje kolory encji na Cesium (zielony → żółty → czerwony)
 
-RADAR nie ma logiki interceptu w pętli symulacji — tylko PILICA i WRE faktycznie zestrzeliwują/ zagłuszają.
+### useDefcon.ts
+- Oblicza poziom DEFCON (1-5):
+  - 5: Wszystko nominalne
+  - 4: Rozstawiono systemy obronne
+  - 3: Wykryto aktywne zagrożenie
+  - 2: Zniszczono ≥1 węzeł LUB ≥3 aktywne zagrożenia
+  - 1: Zniszczono ≥3 węzły
+- Loguje zmianę poziomu
+
+### useCesiumViewer.ts (~966 linii — największy plik)
+Serce aplikacji. Inicjalizuje i zarządza CesiumJS Viewer.
+
+**Inicjalizacja:**
+- Tworzy `Cesium.Viewer` z wyłączonymi wszystkimi kontrolkami UI
+- Ustawia kamerę na Stalową Wolę z wysokości ~4500m
+- Dodaje `PolylineCollection` dla laserów
+- Renderuje rzekę San (glow + core + label)
+- Dodaje `ScreenSpaceEventHandler` dla mouse move (throttled 80ms → hoveredCoords) i left click (deployment mode vs entity picking)
+
+**Renderowanie węzłów:**
+- Dla każdego węzła: cylinder (6-boczny, glass), beacon line, ellipse ring, point + label + coord label
+- Reaguje na zmiany w `nodes` i `mapLayers.nodes`
+
+**Renderowanie relacji:**
+- Paraboliczne krzywe geodezyjne (24 punkty, peak 160m)
+- Glow polyline + floating label card (pill-shaped)
+- Kolory: CYAN (OK), ORANGE (degraded), RED (destroyed)
+- Obsługuje nakładające się relacje (multiple labels wzdłuż krzywej)
+
+**Deployowanie systemów obronnych:**
+- Kliknięcie na mapę z wybraną bronią → tworzy ellipsoidę z `GridMaterialProperty`
+- Dla PATRIOT / PILICA: ładuje rzeczywisty model 3D GLB
+- Dla pozostałych: cylinder (5-boczny) + beacon + label
+
+**Pętla symulacji (requestAnimationFrame):**
+- Porusza zagrożenia po ścieżkach (DIRECT lub RIVER)
+- Dla Shahed: nawigacja wzdłuż SAN_RIVER_COORDS + bank approach
+- Sprawdza odległość do systemów obronnych
+- Rysuje lasery (PolylineCollection: glow outer + solid inner)
+- Aplikuje obrażenia (PILICA: 0.9, PATRIOT: 1.8, WRE: 2.5)
+- Na zniszczeniu: usuwa encję, loguje combat, zmienia status
+- Na impakcie (progress ≥ 1.0): niszczy target node
+
+**Zmiana podkładu mapy:**
+- Standard: CartoDB (light/dark w zależności od theme)
+- Satellite: Esri World Imagery
+- Topo: Esri World Topo Map
 
 ---
 
-### `data/threats.ts`
+## Komponenty (app/components/)
 
-`THREAT_TYPES: Record<string, ThreatType>` — 3 typy:
+### Header.tsx
+- Logo "STEEL SENTINEL" + badge wersji
+- Przycisk "SCHEMAT POWIĄZAŃ" (toggle DependencyFlow)
+- Przycisk "BAZA OBIEKTÓW 3D" (otwiera ThreatModelViewer)
+- Wskaźnik ZAGROŻENIE (1-5) z kolorami: zielony/żółty/pomarańczowy/czerwony
+- Zegar UTC
+- Przyciski: motyw (light/dark), dźwięk (on/off)
 
-| Typ | Speed | Alt | immuneToWRE | Ścieżka |
-|---|---|---|---|---|
-| DRONE | 0.0003 | 120m | false | DIRECT |
-| SHAHED | 0.0005 | 250m | true (odporny na WRE) | RIVER (korytem Sanu) |
-| MISSILE | 0.0014 | 600m | true | DIRECT |
+### AlertTicker.tsx
+- Pasek poniżej headera (fixed, top-12)
+- CSS animation: 40s linear scroll
+- Tryb spokojny: "SAT FEED: STALOWA WOLA NOMINALNA..."
+- Tryb alarmowy (aktywne zagrożenia): "⚠️ ALARM BOJOWY: WYKRYTO ZBLIŻAJĄCE SIĘ POCISKI..."
+
+### CesiumViewport.tsx
+- Container `<div>` dla CesiumJS canvas
+- Obsługuje split-screen (fade-out gdy schemaModeEnabled)
+- `opacity-0 pointer-events-none invisible` gdy schemat aktywny
+
+### LeftSidebar.tsx
+- Panel lewy z 3 zakładkami:
+  - **SZCZEGÓŁY** → NodeList
+  - **KASKADY** → CascadeGraph (z czerwonym ping gdy timery kaskad aktywne)
+  - **ALERT_CMD** → PlaybookControls
+- Zawinięty w CollapsibleCard
+
+### NodeList.tsx
+- Lista wszystkich węzłów z ikonami (typ → lucide icon)
+- Status badge (OPERATIONAL/DEGRADED/DESTROYED)
+- Health bar (zielony/żółty/czerwony)
+- Opis i notatki
+- Formularz **"NOWY OBIEKT"**: nazwa, typ (select), lat/lon, opis, notatki
+- Formularz **"POWIĄZANIE"**: source (select), target (select), typ relacji (select z "CUSTOM")
+
+### CascadeGraph.tsx
+- SVG graf zależności dla 5 węzłów (E2, H1, W3, G4, K7)
+- Strzałki kolorowane na zielono (OK) lub czerwono (destroyed)
+- Alerty kaskadowe: countdown timery dla wody (12h) i chłodzenia (6s)
+- Opisy tekstowe zależności: "Pętla sprzężenia chłodzenia (W3) 🔄 (E2)"
+
+### PlaybookControls.tsx
+- 3 przyciski procedur awaryjnych:
+  - 🚨 SYRENY ALARMOWE (SIREN)
+  - 📱 ALERTY SMS RCB (ALERT_SMS)
+  - ⚡ START GENERATORÓW (BACKUP_GEN)
+- Panel statusu gdy playbook aktywny (z przyciskiem STOP)
+- Każdy playbook ma unikalny opis w panelu statusu
+
+### ArsenalPanel.tsx
+- Panel prawy (w CollapsibleCard)
+- **Arsenał defensywny**: 4 karty systemów obronnych (klikalne, select wskaźnik)
+- "TRYB CELOWANIA AKTYWNY: KLIKNIJ NA MAPĘ" — animowany pasek
+- Licznik aktywnych systemów na karcie
+- **Symulacja zagrożeń**: 4 scenariusze:
+  - SCEN_01: Rój dronów (3x DRONE na HSW, GPZ, MZK)
+  - SCEN_02: Shahed rzeka (2x SHAHED na elektrownię i most)
+  - SCEN_03: Rakieta taktyczna (1x MISSILE na HSW)
+  - SCEN_04: Atak kombinowany (MISSILE + SHAHED + DRONE)
+- Przyciski: RESET, PAUZA/WZNÓW
+
+### ThreatMonitor.tsx
+- Radar monitor (CollapsibleCard, maxHeight: 130px)
+- Lista zagrożeń w odwrotnej chronologii
+- Kolory: czerwony (FLYING), zielony (INTERCEPTED), cyan (JAMMED), przekreślony (IMPACTED)
+- Pusta: "BRAK AKTYWNYCH ECH"
+- Badge z liczbą aktywnych celów
+
+### CommandLogger.tsx
+- Konsola zdarzeń (CollapsibleCard, maxHeight: 130px)
+- Kolorowanie wpisów po typie: error=red, warning=amber, success=emerald, combat=red bold
+- Migający kursor na końcu
+- Max 35 wpisów (auto-pruning w page.tsx)
+
+### CollapsibleCard.tsx
+- Reużywalny wrapper zwijanej karty
+- Chevron animowany, badge, fixedHeight
+- Płynne transition na maxHeight i opacity
+
+### TelemetryHUD.tsx
+- Bottom bar (fixed, center)
+- **Współrzędne GPS**: lat/lon pod kursorem
+- **Alt**: wysokość kamery
+- **Az**: azymut kamery
+- **Skala taktyczna**: "B2G / STALOWA WOLA DIGITAL TWIN"
+- Przycisk **"WARSTWY"** → popover z toggle'ami:
+  - Podkład satelitarny
+  - Węzły strategiczne
+  - Powiązania węzłów
+  - Kopuły ochronne
+  - Wektory zagrożeń
+  - Siatka i strefy
+  - Rzeki i hydrologia
+- **Styl podkładu**: STANDARD / SATELITA / TOPO (3 przyciski)
+
+### ObjectDetailCard.tsx
+- **Dragowalny** panel szczegółów (pointer events, clamped do okna)
+- Pozycja persistowana do localStorage
+- Double-click resetuje pozycję do domyślnej
+- **Tryb Node**: status badge, health bar, opis, notatki, mapa zależności kaskadowych, przyciski NAMIERZ GPS + URUCHOM GENERATORY
+  - Dla OBJ_02 (elektrownia): przycisk DODAJ CHŁODZIWO (resetuje cooling timer)
+  - Dla OBJ_03 (ujęcie wody): przycisk DOŁADUJ POMPY (resetuje water timer)
+- **Tryb System**: zasięg, zwalczane cele, NAMIERZ GPS, ZDEMONTUJ SYSTEM
+
+### DependencyFlow.tsx
+- **Pełnoekranowy widok schematu blokowego** z @xyflow/react
+- Custom węzły `CriticalNodeCard`: nazwa, ID, health bar, notatki, przycisk LOKALIZUJ 3D
+- Krawędzie paraboliczne z kolorami: cyan (OK), żółty (degraded), czerwony (destroyed)
+- Drag-and-drop do tworzenia nowych relacji (z confirmation dialog + wybór typu przepływu)
+- MiniMap + Controls + Background (krzyżyki)
+- Panel edytora: dodawanie węzłów i relacji
+- Pozycje węzłów persistowane do localStorage
+
+### ThreatModelViewer.tsx
+- **Pełnoekranowy przeglądarka 3D** (Three.js)
+- 4 modele GLB: FPV drone, Shahed-136, Patriot PAC-3, PSR-A Pilica
+- Auto-rotacja z OrbitControls
+- Panel info: designation, classification, specyfikacja, analiza wywiadowcza
+- **Katalog zagrożeń**: przyciski prev/next (lewo/prawo)
+- **Karty środków przeciwdziałania**: klikalne → modal z pełną specyfikacją (zakres, skuteczność, dane techniczne)
+- Canvas z: ambient/directional/point lights, ContactShadows, Environment preset "city"
+- Preload wszystkich modeli na starcie (`useGLTF.preload`)
+- Dekoracje: narożniki cyan, HUD overlay z danymi modelu, grid overlay
 
 ---
 
-### `data/river.ts`
+## Stany i logika w page.tsx (SteelSentinelDashboard)
 
-`SAN_RIVER_COORDS` — 8 współrzędnych GPS rzeki San od południowego wschodu na północny zachód. Używane w:
-- Rysowaniu polyline rzeki w Cesium (glow + core)
-- Nawigacji SHAHED wzdłuż koryta (pathType === "RIVER")
-- Po 80% trasy skręca do celu (bankProgress)
+### State management
+- `nodes`, `relations`, `deployedSystems`, `selectedWeapon`, `threats` — główne stany symulacji
+- `logs` — tablica logów (max 35)
+- `defcon` — poziom zagrożenia (1-5)
+- `simSpeed` — prędkość symulacji (0=pauza, 1=normal)
+- `playbookActive` — aktywna procedura alarmowa
+- `soundEnabled`, `theme`, `baseMapType` — preferencje
+- `schemaModeEnabled` — tryb DependencyFlow
+- `threatViewerOpen` — modal ThreatModelViewer
+- `selectedNode`, `selectedSystem` — zaznaczony obiekt (ObjectDetailCard)
+- `mapLayers` — 7 toggle'ów warstw (baseMap, nodes, relations, domes, threats, tacticalZones, hydrology)
+- `coolingSecondsLeft`, `waterSecondsLeft` — timery kaskadowe
+
+### Callbacki
+- `addLog(text, type)` — dodaje wpis z timestampem + odtwarza dźwięk
+- `spawnThreat(type, targetId)` — tworzy nowe zagrożenie (start position losowa)
+- `launchScenario(index)` — 4 predefiniowane scenariusze
+- `activatePlaybook(id, name)` — uruchamia procedurę (SIREN/ALERT_SMS/BACKUP_GEN)
+- `handleReset()` — resetuje wszystko do stanu początkowego
+- `handleNodeClick(node)` — zaznacza i leci do węzła
+- `handleAddNode(newNode)` — dodaje węzeł
+- `handleAddRelation(newRel)` — dodaje relację
+- `handleActivateBackupPower(nodeId)` — ręczne załączenie generatora
+- `handleResetCooling()` — reset chłodzenia (OBJ_02)
+- `handleResetWater()` — reset pomp (OBJ_03)
+- `handleRemoveSystem(sysId)` — demontaż systemu obronnego
+- `handleToggleLayer(key)` — toggle warstwy mapy
+
+### useEffect'y
+1. Ładowanie basemap z localStorage
+2. Zapis basemap do localStorage
+3. Ładowanie theme z localStorage
+4. Sync theme → body class + localStorage
+5. Ładowanie nodes/relations z localStorage
+6. Zapis nodes do localStorage
+7. Zapis relations do localStorage
+8. Sync simStateRef (dla Cesium → unikanie closure stale values)
+9. Zegar (1s interwał)
+10. Resize Cesium viewer przy toggle schema
+
+### symStateRef
+- `MutableRefObject<SimState>` — zawsze aktualny snapshot stanu dla `useCesiumViewer` (przekracza problem zamknięcia w closure)
 
 ---
 
-### `hooks/useAudio.ts`
+## Routing
 
-```typescript
-useAudio(soundEnabled: boolean) => { playBeep }
+Single-page application. Jedna ścieżka:
+- `/` → `app/page.tsx` → `SteelSentinelDashboard`
+
+Brak API routes, dynamic routes, nested layouts.
+
+---
+
+## Interakcje klawiszowo-myszowe
+
+- **Mouse move** na Cesium canvas: throttled (80ms) → aktualizacja HUD z GPS/alt/az
+- **Left click** na Cesium canvas:
+  - Bez wybranej broni: entity picking (node/system selection)
+  - Z wybraną bronią: deploy systemu w kliknięte miejsce
+- **Drag** na ObjectDetailCard: przesuwanie panelu
+- **Double click** na ObjectDetailCard: reset pozycji do domyślnej
+
+---
+
+## Motywy (CSS)
+
+Zdefiniowane w `globals.css` przez CSS custom properties:
+
+| Właściwość | Light | Dark |
+|---|---|---|
+| `--bg-app` | #f8fafc | #020617 |
+| `--bg-panel` | rgba(255,255,255,0.96) | rgba(10,15,30,0.96) |
+| `--border-panel` | #cbd5e1 | #1e293b |
+| `--text-primary` | #0f172a | #e2e8f0 |
+| `--neon-cyan` | #0891b2 | #06b6d4 |
+
+Klasy pomocnicze: `theme-bg-app`, `theme-bg-panel`, `theme-border`, `theme-text-primary`, `theme-neon-text`, `theme-neon-border`, itd.
+Transition 300ms na wszystkich właściwościach.
+
+### clip-chamfer
+- `clip-path` wielokątny (8-punktowy) → ścięte rogi militarny styl
+- `::before` → border (1 warstwa)
+- `::after` → tło panelu z backdrop-filter (1 warstwa)
+- Działa jak border-radius ale z militarnym wyglądem
+
+### Fonty
+- Rajdhani: nagłówki, etykiety (sans-serif, techniczny)
+- Share Tech Mono: dane telemetryczne, monospace
+- JetBrains Mono: główny font body
+
+---
+
+## Scenariusze ataku
+
+| Scenariusz | Zagrożenia | Opis |
+|---|---|---|
+| SCEN_01 | 3x DRONE na OBJ_01, OBJ_04, OBJ_03 | Rój dronów rozpoznawczych |
+| SCEN_02 | 2x SHAHED na OBJ_02, OBJ_06 | Amunicja krążąca korytem Sanu |
+| SCEN_03 | 1x MISSILE na OBJ_01 | Taktyczny pocisk rakietowy |
+| SCEN_04 | MISSILE(OBJ_02) + SHAHED(OBJ_04) + DRONE(OBJ_03) | Atak kombinowany saturacyjny |
+
+---
+
+## Playbooki (Procedury alarmowe)
+
+| Playbook | Efekt |
+|---|---|
+| SYRENY ALARMOWE | Log: "Miejskie syreny akustyczne nadają sygnał alarmowy" + dźwięk sawtooth 320Hz |
+| ALERTY SMS RCB | Log: "Rozesłano kryzysowy komunikat SMS" + dźwięk sine 480Hz |
+| START GENERATORÓW | Wszystkie węzły dostają `backupPower: true` + dźwięk success |
+
+---
+
+## Łańcuchy kaskadowe
+
+```
+OBJ_02 (Elektrownia) zniszczona
+  → OBJ_01 (Huta): health spada do 15% (brak zasilania)
+  → OBJ_03 (Woda): drenaż rezerw 12h (brak zasilania pomp)
+
+OBJ_03 (Woda) zniszczona (lub wyczerpanie rezerw)
+  → OBJ_02 (Elektrownia): wygaszanie turbiny w 6s (brak chłodzenia)
+
+OBJ_04 (GPZ Maziarnia) zniszczony
+  → OBJ_07 (Centrum Kryzysowe): health spada do 40%
 ```
 
-- `playBeep(freq, type, duration)` — tworzy AudioContext, osc + gain, 0.04 volume, exponential ramp do 0.
-- Jeśli `soundEnabled === false` — no-op.
-- Catchuje błędy (np. blokada autoplay).
-
 ---
 
-### `hooks/useDefcon.ts`
+## Uruchamianie
 
-```typescript
-useDefcon(threats, nodes, deployedSystemsLength, defcon, setDefcon, addLog)
-useEffect — odpala przy zmianie threats/nodes/deployedSystems/defcon
+```bash
+npm run dev     # next dev (deweloperski)
+npm run build   # next build (produkcyjny)
+npm run start   # next start (produkcyjny)
+npm run lint    # eslint
 ```
 
-Logika DEFCON:
-- 5: brak zagrożeń, brak broni
-- 4: broń postawiona (deployedSystemsLength > 0)
-- 3: aktywne zagrożenie (FLYING >= 1)
-- 2: zniszczony węzeł (DESTROYED >= 1) lub 3+ aktywne
-- 1: 3+ zniszczone
+---
 
-Zmiana loguje addLog z type: error (1-2), warning (3), info (4-5).
+## Pliki modeli 3D (public/3d_models/)
+
+| Plik | Opis |
+|---|---|
+| `fpv_drone.glb` | Dron FPV (zagrożenie) |
+| `iranian_shahed-136_military_drone.glb` | Shahed-136 (zagrożenie) |
+| `patriot.glb` | MIM-104 Patriot PAC-3 (sojuszniczy) |
+| `pilica.glb` | PSR-A Pilica VSHORAD (sojuszniczy) |
 
 ---
 
-### `hooks/useCascadingEngine.ts`
-
-```typescript
-useCascadingEngine(nodes, setNodes, simSpeed, coolingSecondsLeft, setCoolingSecondsLeft,
-                   waterSecondsLeft, setWaterSecondsLeft, addLog, nodeEntitiesRef)
-```
-
-Interval 1000ms. Logika kaskadowa:
-
-1. **OBJ_02 (elektrownia) DESTROYED/DEGRADED**:
-   - OBJ_01 (huta): health -= 5\*simSpeed, floor 15%, status DEGRADED
-   - OBJ_03 (woda): jeśli OPERATIONAL → `setWaterSecondsLeft(12)`, error log
-
-2. **waterSecondsLeft countdown**: -= 1\*simSpeed, przy 0 → OBJ_03 DESTROYED
-
-3. **OBJ_03 DESTROYED/DEGRADED**:
-   - OBJ_02: jeśli OPERATIONAL → `setCoolingSecondsLeft(6)`, error log
-
-4. **coolingSecondsLeft countdown**: -= 1\*simSpeed, przy 0 → OBJ_02 DESTROYED
-
-5. **OBJ_04 (GPZ) DESTROYED**: OBJ_07 → health 40, DEGRADED
-
-Po zmianach: aktualizuje `nodeEntitiesRef` (kolory point entities w Cesium: green/amber/red).
-
----
-
-### `hooks/useCesiumViewer.ts`
-
-```typescript
-useCesiumViewer({ containerRef, simStateRef, centerLat, centerLon,
-                  onAddLog, setDeployedSystems, setThreats, setNodes,
-                  setSelectedWeapon, setHoveredCoords,
-                  setSelectedNode?, setSelectedSystem? }) => {
-  viewerRef, nodeEntitiesRef, domeEntitiesRef, threatEntitiesRef,
-  isCesiumLoaded, flyToNode, resetViewer, removeDeployedSystem
-}
-```
-
-**Init Cesium Viewer** (useEffect, []):
-
-- `new Cesium.Viewer(...)` z wyłączonymi wszystkimi kontrolkami, creditContainer w dummy div
-- `imageryProvider: false` (bez Bing), potem `UrlTemplateImageryProvider` z CartoDB light_all
-- `terrain: undefined`, `depthTestAgainstTerrain: false` (entity widoczne pod ziemią)
-- `skyAtmosphere: false`, `fog: false`, `globe.baseColor: #f3f4f6` (light)
-- `resolutionScale: Math.min(1.0, devicePixelRatio)` — zapobiega rozmyciu na Retina
-- `PolylineCollection` dla laserów (primitive — wydajniejsze niż entity)
-
-**Entity tworzone**:
-
-1. **7 węzłów**: każdy to cylinder hexagonal (glassmorphic, 6 slices) + polyline beacon (ground→180m) + ground ellipse + point marker + label (dark text, WHITE outline, outlineWidth 6, scale 0.3) + sub-label GPS
-2. **Rzeka San**: glow polyline (width 8, glowPower 0.35) + core polyline (width 2.5, cyan) + label
-3. **Zona taktyczna**: rectangle (22.01-22.09, 50.52-50.60) + NW/SE corner labels
-4. **Bronie** (przy deploy): ellipsoid z `GridMaterialProperty` (lineCount 12x12, thickness 2.5) + ground ellipse + tower cylinder (5 slices) + beacon + label
-
-**Eventy**:
-
-- **MOUSE_MOVE**: throttle 80ms, pickEllipsoid → `setHoveredCoords({lat, lon, alt, az})`
-- **LEFT_CLICK — deploy mode** (`selectedWeapon !== null`):
-  - Walidacja bounding box: lat 50.51-50.61, lon 22.01-22.09
-  - Tworzy DeployedSystem + Cesium entity
-  - `setDeployedSystems`, `setSelectedWeapon(null)`
-- **LEFT_CLICK — picking mode** (`selectedWeapon === null`):
-  - `scene.pick(click.position)` → dopasowuje entity.id do:
-    - `nodes[].id` (OBJ_01 itd.) → `setSelectedNode`, `flyToNode`
-    - `deployedSystems[].id` → `setSelectedSystem`
-  - Pusty klik → czyści selekcję
-
-**Pętla symulacji** (requestAnimationFrame):
-
-- Czyta `simStateRef.current` (speed, threats, nodes, systems)
-- Czyści lasery (`laserLinesRef.current.removeAll()`)
-- Dla każdego FLYING threata:
-  1. `progress += 0.003 * speed`
-  2. Interpolacja pozycji (DIRECT: liniowa, RIVER: po współrzędnych Sanu, bankProgress 0.8-1.0)
-  3. Tworzy/aktualizuje entity threata (point + label)
-  4. Dla każdego systemu: `Cartesian3.distance(sysPos, threatPos)`
-     - Jeśli ≤ radius: sprawdza `activeMatch` (PILICA zawsze, WRE tylko !immuneToWRE)
-     - Rysuje lasery (glow + core), zadaje damage (PILICA 0.9, WRE 2.5)
-     - health ≤ 0: status INTERCEPTED/JAMMED, remove entity, setThreats
-  5. `progress >= 1.0` i nie zestrzelony: IMPACTED, target node DESTROYED
-
-**Zwracane funkcje**:
-
-- `flyToNode(lat, lon, name)` — `camera.flyTo` z wysokością 1000m, pitch -35°
-- `resetViewer()` — usuwa domy i threaty z Cesium, resetuje kolory węzłów na green
-- `removeDeployedSystem(sysId)` — usuwa entity po id (sysId, sysId_tower, sysId_beacon, sysId_label)
-
-Cleanup: `cancelAnimationFrame`, `handler.destroy()`, `viewer.destroy()`.
-
----
-
-### `page.tsx` (SteelSentinelDashboard)
-
-Orchestrator — ok. 360 linii. Cały stan + callbacki + render.
-
-**Stan** (useState):
-- `nodes: CriticalNode[]` — inicjalizowany z `INITIAL_NODES`
-- `deployedSystems: DeployedSystem[]`
-- `selectedWeapon: WeaponType | null`
-- `threats: Threat[]`
-- `logs: LogEntry[]` — 3 początkowe wpisy
-- `defcon: number` — start 5
-- `simSpeed: number` — 1 (0 = pauza)
-- `playbookActive: string | null`
-- `soundEnabled: boolean`
-- `activeTab: SidebarTab`
-- `clockTime: string`
-- `hoveredCoords: HoveredCoords`
-- `coolingSecondsLeft / waterSecondsLeft: number | null`
-- `leftSidebarOpen / rightSidebarOpen: boolean`
-- `selectedNode / selectedSystem: ... | null`
-
-**simStateRef**: useRef snapshot dla pętli Cesium, aktualizowany useEffect przy każdej zmianie.
-
-**clockTime timer**: setInterval 1s.
-
-**Callbacki**:
-
-- `addLog(text, type)` — append do logs (max 35), playBeep per type
-- `spawnThreat(type, targetId)` — tworzy Threat, startLat random w paśmie, startLon = CENTER_LON + 0.08 (wschód), SHAHED pathType=RIVER
-- `launchScenario(index)` — 4 scenariusze z setTimeout
-- `activatePlaybook(id, name)` — SIREN / ALERT_SMS / BACKUP_GEN
-- `handleReset` — resetuje stan + resetViewer
-- `handleNodeClick(node)` — selectedNode + flyToNode
-- `handleActivateBackupPower(nodeId)` — backupPower=true
-- `handleResetCooling()` — przywraca OBJ_02
-- `handleResetWater()` — przywraca OBJ_03
-- `handleRemoveSystem(sysId)` — deployedSystems.filter + removeDeployedSystem
-
-Używa hooków: `useAudio`, `useCascadingEngine`, `useDefcon`, `useCesiumViewer`.
-
----
-
-### Components
-
----
-
-#### `Header.tsx`
-
-Props: `defcon, clockTime, soundEnabled, onToggleSound`
-
-- Po lewej: logo (Shield icon + "STEEL SENTINEL" + "CESIUM_COP v4.0.2") + Compass + "STALOWA WOLA DIGITAL TWIN"
-- Po prawej: DEFCON badge (kolor/animacja per poziom) + zegar UTC + mute toggle
-- `onAddLog` w props ale nieużywany (onToggleSound woła addLog w page.tsx, nie tutaj)
-
----
-
-#### `AlertTicker.tsx`
-
-Props: `threats: Threat[]`
-
-- fixed top-12, wysokość 24px, slate-900 tło
-- "TACTICAL FEED" label + ticker (CSS animation 40s)
-- if any FLYING → czerwony alert, else normalny status feed
-
----
-
-#### `CesiumViewport.tsx`
-
-Props: `cesiumContainerRef: MutableRefObject<HTMLDivElement | null>`
-
-- `<main>` z `pt-[72px]` (miejsce na header + ticker)
-- `<div ref={cesiumContainerRef}>` — tutaj Cesium rysuje canvas
-- Floating badge: "CESIUM_GIS_LINK" + "STW_GRID: 3D TERRAIN ACTIVE"
-- `cursor-crosshair` na kontenerze
-
----
-
-#### `LeftSidebar.tsx`
-
-Props: `activeTab, onTabChange, nodes, coolingSecondsLeft, waterSecondsLeft, onNodeClick, playbookActive, onActivatePlaybook, onStopPlaybook, isOpen, onToggle`
-
-- fixed left-4, top-20, width 320px, height calc(100vh - 230px)
-- `clip-chamfer`, `backdrop-blur-md`
-- **Toggle button** po prawej stronie (vertical "UKRYJ"/"WĘZŁY")
-- `translate-x` animacja 300ms — wysuwa/chowa sidebar
-- 3 zakładki: SZCZEGÓŁY / KASKADY / ALERT_CMD
-- Renderuje warunkowo: NodeList | CascadeGraph | PlaybookControls
-- Zakładka KASKADY ma czerwone ping gdy timery aktywne
-
----
-
-#### `NodeList.tsx`
-
-Props: `nodes, onNodeClick`
-
-- "WĘZŁY INFRASTRUKTURY" + licznik OPERATIONAL/07
-- Lista węzłów: ikonka per type, nazwa, status badge, opis, health bar (kolor wg poziomu), notes
-- Kliknięcie → `onNodeClick(node)` (flyTo w page.tsx)
-- Kolory: DESTROYED=red, DEGRADED=amber, OPERATIONAL=slate
-
----
-
-#### `CascadeGraph.tsx`
-
-Props: `nodes, coolingSecondsLeft, waterSecondsLeft`
-
-- "GRAF ZALEŻNOŚCI MIĘDZYWĘZŁOWYCH"
-- **Alert box**: gdy timery aktywne — czerwony z AlertTriangle + countdown
-- **SVG 280x160**: strzałki (green/red) + kółka z etykietami (E2, H1, W3, G4, K7)
-- Strzałki: E2→H1, E2→W3, W3→E2 (feedback loop), G4→K7
-- Opisy zależności pod spodem
-
----
-
-#### `PlaybookControls.tsx`
-
-Props: `playbookActive, onActivatePlaybook, onStopPlaybook`
-
-- "PROCEDURY BEZPIECZEŃSTWA (PLAYBOOKS)"
-- 3 przyciski: SYRENY (amber), ALERTY SMS (cyan), START GENERATORÓW (emerald)
-- Każdy z "ODPAL" badge
-- Gdy `playbookActive` — panel "PROCEDURA W TOKU" z opisem per id + STOP button
-
----
-
-#### `ArsenalPanel.tsx`
-
-Props: `weapons, deployedSystems, selectedWeapon, onSelectWeapon, onLaunchScenario, onReset, simSpeed, onTogglePause, onAddLog, isOpen, onToggle`
-
-- fixed right-4, top-20, width 320px
-- **Toggle button** po lewej stronie (vertical "UKRYJ"/"ARSENAŁ")
-- Sekcja broni: lista WEAPONS z klikiem → select/deselect + "TRYB CELOWANIA AKTYWNY"
-- Każda broń: kolorowa kropka, nazwa, opis, zasięg, pokrywane cele, licznik AKTYWNE
-- Sekcja scenariuszy: grid 2x2 — SCEN_01 do SCEN_04
-- Dolny rząd: RESET SYSTEMU + PAUZA SIM/WZNÓW SIM (toggle)
-- `translate-x` animacja po isOpen
-
----
-
-#### `ObjectDetailCard.tsx`
-
-Props: `selectedNode, selectedSystem, onClose, onActivateBackupPower, coolingSecondsLeft, waterSecondsLeft, onResetCooling, onResetWater, onRemoveSystem, onFlyTo`
-
-- fixed bottom-44, centered, width 480px, z-50
-- Renderuje się tylko gdy `selectedNode || selectedSystem` (inaczej null)
-- **Node mode**:
-  - Status badge + GPS coordinates
-  - Health bar (rounded, z animacją)
-  - Description + notes (amber box dla system messages)
-  - "MAPA ZALEŻNOŚCI KASKADOWYCH" — per-node info o zależnościach
-  - 2 przyciski: NAMIERZ GPS + URUCHOM GENERATORY (disabled gdy już aktywne)
-  - Emergency override dla OBJ_02 (coolingSecondsLeft) i OBJ_03 (waterSecondsLeft) — czerwone pulse box + przycisk restartu
-- **System mode**:
-  - Status: AKTYWNY / SKANOWANIE + GPS
-  - Zasięg, zwalczane cele, sygnatura WebGL
-  - NAMIERZ GPS + ZDEMONTUJ SYSTEM (usuwa z Cesium + state)
-
----
-
-#### `ThreatMonitor.tsx`
-
-Props: `threats, nodes, isOpen`
-
-- fixed left-4 bottom-4, width 320px, height 144px
-- "MONITOR WYKRYWANIA RADAROWEGO" + licznik ECHO CELE
-- Lista threatów (reverse order): nazwa, typ, cel, status (AKTYWNY/ZESTRZELONY/ZAKŁÓCONY/TRAFIENIE)
-- Kolory per status: red/emerald/blue/slate line-through
-- Empty state: "BRAK AKTYWNYCH ECH"
-- `translate-x` animacja po isOpen
-
----
-
-#### `CommandLogger.tsx`
-
-Props: `logs, clockTime, isOpen`
-
-- fixed right-4 bottom-4, width 384px, height 144px
-- "KONSOLA ZDARZEŃ BOJOWYCH I ALARMOWYCH"
-- Lista logów: timestamp + kolorowany tekst per type
-- Cursor blink na końcu (pulsująca cyan kreska)
-- `translate-x` animacja po isOpen
-
----
-
-#### `TelemetryHUD.tsx`
-
-Props: `hoveredCoords`
-
-- fixed bottom-4 center, px-6 py-2
-- 4 sekcje: GPS coord (cyan), Altitude, Azimuth, Tactical Scale
-- Wartości z `hoveredCoords` (aktualizowane przez mouse move w Cesium)
-
----
-
-## Ważne uwagi techniczne
-
-1. **CesiumJS przez CDN** — `(window as any).Cesium`, żadnych importów ani typów npm.
-2. **Next.js 16 breaking changes** — sprawdź `AGENTS.md` i `node_modules/next/dist/docs/`.
-3. **Three.js jest DEAD** — w package.json, zero importów. Nie używać.
-4. **`backend/` pusty** — `.gitignore` hintuje Laravel, ale nic nie ma.
-5. **`code.html`** w root — stary prototyp HTML. Nie ruszać.
-6. **Tailwind v4 składnia** — `@import "tailwindcss"`, brak `tailwind.config`. Klasy jak w v3 + nowe (np. `rounded-[...]`).
-7. **Brak lintera/formattera** — eslint tylko next-core. Trzymaj się istniejącego stylu.
-8. **Custom CSS w globals.css** — font-rajdhani/sharetech/jetbrains, ticker animacja, terminal-scroll, clip-chamfer.
-9. **Lasery w PolylineCollection** (primitive, nie entity) dla wydajności — czyszczone `removeAll()` co klatkę.
-10. **Logi max 35** — `if (next.length > 35) next.shift()`.
-11. **Wszystkie entity Cesium mają `disableDepthTestDistance: POSITIVE_INFINITY`** — zawsze widoczne na wierzchu.
-12. **Entity ID dla broni** — domyślnie `SYS_${Date.now()}`, potem `_tower`, `_beacon`, `_label` — te sub-ID są używane przy `removeDeployedSystem` i przy entity pickingu.
+## Uwagi techniczne
+
+- CesiumJS ładowany z CDN (nie npm) — dostępny jako `window.Cesium`
+- Next.js w wersji 16 — sprawdzać `node_modules/next/dist/docs/` przed pisaniem kodu (zgodnie z AGENTS.md)
+- Tailwind v4 — nowa składnia: `@import "tailwindcss"` (brak pliku konfiguracyjnego)
+- Wszystkie interfejsy w jednym pliku `types/index.ts`
+- Brak plików CSS modules — wszystkie style w `globals.css` + Tailwind utility classes
+- `three` jest zainstalowane ale nie importowane bezpośrednio w żadnym pliku źródłowym (dependency fiber/drei)

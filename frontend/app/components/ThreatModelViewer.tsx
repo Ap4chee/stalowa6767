@@ -448,10 +448,10 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
               <div>
                 <div className="text-[8px] font-bold font-rajdhani tracking-widest theme-text-muted mb-1">KLASYFIKACJA</div>
                 <span className={`text-[11px] font-bold font-rajdhani tracking-widest px-2.5 py-1 border rounded ${threat.threat === "KRYTYCZNY"
-                    ? "text-red-500 border-red-500/40 bg-red-500/10 animate-pulse"
-                    : threat.threat === "SOJUSZNICZY"
-                      ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
-                      : "text-amber-500 border-amber-500/40 bg-amber-500/10"
+                  ? "text-red-500 border-red-500/40 bg-red-500/10 animate-pulse"
+                  : threat.threat === "SOJUSZNICZY"
+                    ? "text-emerald-500 border-emerald-500/40 bg-emerald-500/10"
+                    : "text-amber-500 border-amber-500/40 bg-amber-500/10"
                   }`}>
                   {threat.threat}
                 </span>
