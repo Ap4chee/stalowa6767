@@ -29,6 +29,10 @@ export interface DeployedSystem {
   lon: number;
   radius: number;
   color: string;
+  status?: "OPERATIONAL" | "RELOCATING";
+  relocationSecondsLeft?: number;
+  targetLat?: number;
+  targetLon?: number;
 }
 
 export interface ThreatType {

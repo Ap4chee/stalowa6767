@@ -139,6 +139,186 @@ export function useCesiumViewer({
     }
   }, []);
 
+  const drawDeployedSystem = useCallback((sys: DeployedSystem) => {
+    const viewer = viewerRef.current;
+    const Cesium = (window as any).Cesium;
+    if (!viewer || !Cesium) return;
+
+    const idsToRemove = [sys.id, `${sys.id}_tower`, `${sys.id}_model`, `${sys.id}_beacon`, `${sys.id}_label`];
+    idsToRemove.forEach(id => {
+      const ent = viewer.entities.getById(id);
+      if (ent) viewer.entities.remove(ent);
+    });
+
+    if (domeEntitiesRef.current[sys.id]) {
+      const ents = domeEntitiesRef.current[sys.id];
+      if (Array.isArray(ents)) {
+        ents.forEach(ent => viewer.entities.remove(ent));
+      } else {
+        viewer.entities.remove(ents);
+      }
+      delete domeEntitiesRef.current[sys.id];
+    }
+
+    const lon = sys.lon;
+    const lat = sys.lat;
+
+    const isRelocating = sys.status === "RELOCATING";
+    const opacity = isRelocating ? 0.25 : 1.0;
+
+    const domeEntity = viewer.entities.add({
+      id: sys.id,
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+      ellipsoid: {
+        radii: new Cesium.Cartesian3(sys.radius, sys.radius, sys.radius),
+        material: new Cesium.GridMaterialProperty({
+          color: Cesium.Color.fromCssColorString(sys.color).withAlpha(0.9 * opacity),
+          cellAlpha: 0.05 * opacity,
+          lineCount: new Cesium.Cartesian2(12, 12),
+          thickness: new Cesium.Cartesian2(2.5, 2.5)
+        }),
+        outline: false,
+        minimumCone: 0,
+        maximumCone: Cesium.Math.PI_OVER_TWO
+      },
+      show: mapLayers.domes
+    });
+
+    const groundCircle = viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(lon, lat),
+      ellipse: {
+        semiMajorAxis: sys.radius,
+        semiMinorAxis: sys.radius,
+        material: Cesium.Color.fromCssColorString(sys.color).withAlpha(0.04 * opacity),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString(sys.color).withAlpha(0.5 * opacity),
+        outlineWidth: 2,
+        height: 0
+      },
+      show: mapLayers.domes
+    });
+
+    const deployedGlassColor = Cesium.Color.fromCssColorString(sys.color).withAlpha(0.25 * opacity);
+
+    if (sys.type === "PATRIOT") {
+      const heading = Cesium.Math.toRadians(0);
+      const pitch = 0;
+      const roll = 0;
+      const hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
+      const position = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+      const orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
+
+      viewer.entities.add({
+        id: sys.id + "_model",
+        position: position,
+        orientation: orientation as any,
+        model: {
+          uri: "/3d_models/patriot.glb",
+          scale: 25,
+          minimumPixelSize: 64,
+          maximumScale: 50,
+          silhouetteColor: Cesium.Color.fromCssColorString(sys.color).withAlpha(opacity),
+          silhouetteSize: 1.5,
+          colorBlendMode: Cesium.ColorBlendMode.MIX,
+          colorBlendAmount: 0.1,
+          color: Cesium.Color.WHITE.withAlpha(opacity)
+        }
+      });
+
+      viewer.entities.add({
+        id: sys.id + "_beacon",
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+            lon, lat, 0,
+            lon, lat, 120
+          ]),
+          width: 2,
+          material: Cesium.Color.fromCssColorString(sys.color).withAlpha(0.8 * opacity)
+        }
+      });
+    } else if (sys.type === "PILICA") {
+      const heading = Cesium.Math.toRadians(0);
+      const pitch = 0;
+      const roll = 0;
+      const hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
+      const position = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+      const orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
+
+      viewer.entities.add({
+        id: sys.id + "_model",
+        position: position,
+        orientation: orientation as any,
+        model: {
+          uri: "/3d_models/pilica.glb",
+          scale: 30,
+          minimumPixelSize: 64,
+          maximumScale: 50,
+          silhouetteColor: Cesium.Color.fromCssColorString(sys.color).withAlpha(opacity),
+          silhouetteSize: 1.5,
+          colorBlendMode: Cesium.ColorBlendMode.MIX,
+          colorBlendAmount: 0.1,
+          color: Cesium.Color.WHITE.withAlpha(opacity)
+        }
+      });
+
+      viewer.entities.add({
+        id: sys.id + "_beacon",
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+            lon, lat, 0,
+            lon, lat, 100
+          ]),
+          width: 2,
+          material: Cesium.Color.fromCssColorString(sys.color).withAlpha(0.8 * opacity)
+        }
+      });
+    } else {
+      viewer.entities.add({
+        id: sys.id + "_tower",
+        position: Cesium.Cartesian3.fromDegrees(lon, lat, 20),
+        cylinder: {
+          length: 40, topRadius: 10, bottomRadius: 12,
+          slices: 5,
+          material: deployedGlassColor,
+          outline: false
+        }
+      });
+
+      viewer.entities.add({
+        id: sys.id + "_beacon",
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+            lon, lat, 0,
+            lon, lat, 70
+          ]),
+          width: 1.5,
+          material: Cesium.Color.fromCssColorString(sys.color).withAlpha(0.8 * opacity)
+        }
+      });
+    }
+
+    const labelHeight = sys.type === "PATRIOT" ? 130 : sys.type === "PILICA" ? 110 : 70;
+    viewer.entities.add({
+      id: sys.id + "_label",
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, labelHeight),
+      label: {
+        text: (sys.name + (isRelocating ? ` (MARSZ: ${sys.relocationSecondsLeft}s)` : "")).toUpperCase(),
+        font: "bold 38px 'JetBrains Mono', 'Segoe UI', Arial, sans-serif",
+        fillColor: Cesium.Color.fromCssColorString(isRelocating ? "#f59e0b" : "#0f172a"),
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        outlineColor: Cesium.Color.WHITE,
+        outlineWidth: 5,
+        showBackground: false,
+        scale: 0.32,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(0, -12),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      }
+    });
+
+    domeEntitiesRef.current[sys.id] = [domeEntity, groundCircle];
+  }, [mapLayers.domes]);
+
   useEffect(() => {
     const Cesium = (window as any).Cesium;
     if (!Cesium || !containerRef.current) return;
@@ -577,6 +757,7 @@ export function useCesiumViewer({
 
         systems.forEach((sys) => {
           if (interceptedThisFrame) return;
+          if (sys.status === "RELOCATING") return;
 
           const sysPos = Cesium.Cartesian3.fromDegrees(sys.lon, sys.lat, 145);
           const distance = Cesium.Cartesian3.distance(sysPos, threatPos);
@@ -1085,6 +1266,7 @@ export function useCesiumViewer({
     isCesiumLoaded,
     flyToNode,
     resetViewer,
-    removeDeployedSystem
+    removeDeployedSystem,
+    drawDeployedSystem
   };
 }

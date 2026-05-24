@@ -184,7 +184,8 @@ export default function SteelSentinelDashboard() {
     nodeEntitiesRef,
     flyToNode,
     resetViewer,
-    removeDeployedSystem
+    removeDeployedSystem,
+    drawDeployedSystem
   } = useCesiumViewer({
     containerRef: cesiumContainerRef,
     simStateRef,
@@ -396,6 +397,75 @@ export default function SteelSentinelDashboard() {
     addLog(`DOWÓDZTWO: Zdemontowano tarczę defensywną ${matched.name}.`, "warning");
   }, [deployedSystems, removeDeployedSystem, addLog]);
 
+  const handleRelocateSystem = useCallback((sysId: string, lat: number, lon: number, seconds: number) => {
+    const matched = deployedSystems.find(s => s.id === sysId);
+    if (!matched) return;
+
+    addLog(`ROZKAZ MARSZU: Rozpoczęto przemieszczanie baterii ${matched.name} na pozycję [${lat.toFixed(4)} N, ${lon.toFixed(4)} E]. Estymowany czas marszu: ${seconds}s.`, "info");
+
+    const updatedSys = {
+      ...matched,
+      status: "RELOCATING" as const,
+      relocationSecondsLeft: seconds,
+      targetLat: lat,
+      targetLon: lon
+    };
+
+    setDeployedSystems(prev => prev.map(s => s.id === sysId ? updatedSys : s));
+
+    if (drawDeployedSystem) {
+      drawDeployedSystem(updatedSys);
+    }
+  }, [deployedSystems, drawDeployedSystem, addLog]);
+
+  // Relocation Tick countdown
+  useEffect(() => {
+    const relocatingUnits = deployedSystems.filter(s => s.status === "RELOCATING");
+    if (relocatingUnits.length === 0) return;
+
+    const interval = setInterval(() => {
+      setDeployedSystems(prev => {
+        return prev.map(sys => {
+          if (sys.status === "RELOCATING") {
+            const timeLeft = (sys.relocationSecondsLeft || 1) - 1;
+            if (timeLeft <= 0) {
+              addLog(`MARSZ TAKTYCZNY ZAKOŃCZONY: Bateria ${sys.name} osiągnęła pozycję bojową [${sys.targetLat?.toFixed(4)} N, ${sys.targetLon?.toFixed(4)} E] i jest OPERACYJNA!`, "success");
+              const updatedSys = {
+                ...sys,
+                lat: sys.targetLat || sys.lat,
+                lon: sys.targetLon || sys.lon,
+                status: "OPERATIONAL" as const,
+                relocationSecondsLeft: undefined,
+                targetLat: undefined,
+                targetLon: undefined
+              };
+              setTimeout(() => {
+                if (drawDeployedSystem) {
+                  drawDeployedSystem(updatedSys);
+                }
+              }, 50);
+              return updatedSys;
+            } else {
+              const updatedSys = {
+                ...sys,
+                relocationSecondsLeft: timeLeft
+              };
+              setTimeout(() => {
+                if (drawDeployedSystem) {
+                  drawDeployedSystem(updatedSys);
+                }
+              }, 50);
+              return updatedSys;
+            }
+          }
+          return sys;
+        });
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [deployedSystems, drawDeployedSystem, addLog]);
+
   return (
     <div className="flex flex-col flex-1 h-screen relative select-none">
       <Header
@@ -468,6 +538,9 @@ export default function SteelSentinelDashboard() {
               onAddRelation={handleAddRelation}
               isCollapsed={leftPanelCollapsed}
               onToggle={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+              deployedSystems={deployedSystems}
+              onRemoveSystem={handleRemoveSystem}
+              onRelocateSystem={handleRelocateSystem}
             />
 
             <ThreatMonitor
