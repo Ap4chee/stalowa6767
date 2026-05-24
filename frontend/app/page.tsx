@@ -466,6 +466,10 @@ export default function SteelSentinelDashboard() {
     return () => clearInterval(interval);
   }, [deployedSystems, drawDeployedSystem, addLog]);
 
+  const currentSelectedSystem = selectedSystem
+    ? deployedSystems.find(s => s.id === selectedSystem.id) || selectedSystem
+    : null;
+
   return (
     <div className="flex flex-col flex-1 h-screen relative select-none">
       <Header
@@ -538,9 +542,6 @@ export default function SteelSentinelDashboard() {
               onAddRelation={handleAddRelation}
               isCollapsed={leftPanelCollapsed}
               onToggle={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
-              deployedSystems={deployedSystems}
-              onRemoveSystem={handleRemoveSystem}
-              onRelocateSystem={handleRelocateSystem}
             />
 
             <ThreatMonitor
@@ -612,6 +613,7 @@ export default function SteelSentinelDashboard() {
         onResetCooling={handleResetCooling}
         onResetWater={handleResetWater}
         onRemoveSystem={handleRemoveSystem}
+        onRelocateSystem={handleRelocateSystem}
         onFlyTo={flyToNode}
         leftSidebarCollapsed={leftPanelCollapsed}
       />

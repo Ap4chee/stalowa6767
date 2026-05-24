@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { X, BatteryCharging, ShieldAlert, Navigation, Settings2, Trash2, RotateCcw } from "lucide-react";
-import { CriticalNode, DeployedSystem, WeaponType } from "../types";
+import { CriticalNode, DeployedSystem } from "../types";
 import { WEAPONS } from "../data/weapons";
 
 interface ObjectDetailCardProps {
@@ -15,8 +15,34 @@ interface ObjectDetailCardProps {
   onResetCooling: () => void;
   onResetWater: () => void;
   onRemoveSystem: (sysId: string) => void;
+  onRelocateSystem?: (sysId: string, lat: number, lon: number, seconds: number) => void;
   onFlyTo: (lat: number, lon: number, name: string) => void;
   leftSidebarCollapsed?: boolean;
+}
+
+// Distance helper
+function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Relocation rate in seconds per kilometer
+function getRelocationRate(type: string) {
+  switch (type) {
+    case "PATRIOT": return 8;
+    case "PILICA": return 4;
+    case "RADAR": return 3;
+    default: return 2;
+  }
 }
 
 export function ObjectDetailCard({
@@ -29,6 +55,7 @@ export function ObjectDetailCard({
   onResetCooling,
   onResetWater,
   onRemoveSystem,
+  onRelocateSystem,
   onFlyTo,
   leftSidebarCollapsed = false
 }: ObjectDetailCardProps) {
@@ -36,6 +63,20 @@ export function ObjectDetailCard({
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({ startX: 0, startY: 0, posX: 0, posY: 0 });
   const cardRef = useRef<HTMLDivElement>(null);
+
+  // Relocation states
+  const [isRelocatingFormOpen, setIsRelocatingFormOpen] = useState(false);
+  const [targetLat, setTargetLat] = useState("");
+  const [targetLon, setTargetLon] = useState("");
+
+  // Reset form when system changes
+  useEffect(() => {
+    if (selectedSystem) {
+      setIsRelocatingFormOpen(false);
+      setTargetLat(selectedSystem.lat.toFixed(4));
+      setTargetLon(selectedSystem.lon.toFixed(4));
+    }
+  }, [selectedSystem]);
 
   // Load persisted position from localStorage if it exists
   useEffect(() => {
@@ -64,10 +105,7 @@ export function ObjectDetailCard({
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Only drag on left click or touch
     if (e.button !== 0) return;
-    
-    // Don't drag if clicking buttons, links or interactive elements
     const target = e.target as HTMLElement;
     if (target.closest("button") || target.closest("input") || target.closest("a") || target.closest("svg")) {
       return;
@@ -82,10 +120,7 @@ export function ObjectDetailCard({
         posY: rect.top
       };
       setIsDragging(true);
-      
-      // Prevent text selection while dragging
       e.preventDefault();
-      // Capture pointer so it continues tracking even outside the window
       target.setPointerCapture(e.pointerId);
     }
   };
@@ -100,9 +135,8 @@ export function ObjectDetailCard({
       let newX = dragStartRef.current.posX + deltaX;
       let newY = dragStartRef.current.posY + deltaY;
 
-      // Keep it within screen bounds with nice padding
       const padding = 20;
-      const cardWidth = 400; // w-[400px]
+      const cardWidth = 400;
       
       newX = Math.max(padding, Math.min(window.innerWidth - cardWidth - padding, newX));
       newY = Math.max(padding, Math.min(window.innerHeight - 100, newY));
@@ -112,8 +146,6 @@ export function ObjectDetailCard({
 
     const handlePointerUp = () => {
       setIsDragging(false);
-      
-      // Save final position to localStorage
       if (cardRef.current) {
         const rect = cardRef.current.getBoundingClientRect();
         savePosition({ x: rect.left, y: rect.top });
@@ -138,10 +170,42 @@ export function ObjectDetailCard({
   };
 
   const getStatusColor = (status: string) => {
-    if (status === "OPERATIONAL") return "text-emerald-700 dark:text-emerald-400 border-emerald-500/40 bg-emerald-555/10 dark:bg-emerald-950/10";
-    if (status === "DEGRADED") return "text-amber-700 dark:text-amber-400 border-amber-500/40 bg-amber-555/10 dark:bg-amber-950/10";
-    return "text-red-700 dark:text-red-400 border-red-500/40 bg-red-555/10 dark:bg-red-950/10";
+    if (status === "OPERATIONAL") return "text-emerald-700 dark:text-emerald-400 border-emerald-500/40 bg-emerald-500/10 dark:bg-emerald-950/10";
+    if (status === "DEGRADED") return "text-amber-700 dark:text-amber-400 border-amber-500/40 bg-amber-500/10 dark:bg-amber-950/10";
+    return "text-red-700 dark:text-red-400 border-red-500/40 bg-red-500/10 dark:bg-red-950/10";
   };
+
+  // Live estimated distance and transfer time
+  const getRelocationEstimate = () => {
+    if (!selectedSystem) return null;
+    const latNum = parseFloat(targetLat);
+    const lonNum = parseFloat(targetLon);
+    if (isNaN(latNum) || isNaN(lonNum)) return null;
+
+    const distance = calculateDistanceKm(selectedSystem.lat, selectedSystem.lon, latNum, lonNum);
+    const rate = getRelocationRate(selectedSystem.type);
+    const seconds = Math.max(3, Math.round(distance * rate));
+    return {
+      distance: distance.toFixed(2),
+      seconds
+    };
+  };
+
+  const handleConfirmRelocation = () => {
+    if (!selectedSystem || !onRelocateSystem) return;
+    const latNum = parseFloat(targetLat);
+    const lonNum = parseFloat(targetLon);
+    if (isNaN(latNum) || isNaN(lonNum)) return;
+
+    const distance = calculateDistanceKm(selectedSystem.lat, selectedSystem.lon, latNum, lonNum);
+    const rate = getRelocationRate(selectedSystem.type);
+    const seconds = Math.max(3, Math.round(distance * rate));
+
+    onRelocateSystem(selectedSystem.id, latNum, lonNum, seconds);
+    setIsRelocatingFormOpen(false);
+  };
+
+  const est = getRelocationEstimate();
 
   return (
     <div 
@@ -288,7 +352,7 @@ export function ObjectDetailCard({
             </button>
           </div>
 
-          {/* EMERGENCY TRIGGER BUTTONS (e.g. cooling overrides!) */}
+          {/* EMERGENCY TRIGGER BUTTONS */}
           {selectedNode.id === "OBJ_02" && coolingSecondsLeft !== null && (
             <div className="mt-1 bg-red-500/10 border border-red-500/40 p-2.5 flex flex-col gap-2 rounded animate-pulse">
               <div className="flex justify-between items-center text-[10px] text-red-600 dark:text-red-400 font-bold">
@@ -327,15 +391,29 @@ export function ObjectDetailCard({
       {selectedSystem && (
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-2 text-[10px]">
-            <div className="border border-cyan-500/40 bg-cyan-500/10 p-2 flex flex-col gap-0.5 text-cyan-700 dark:text-cyan-400">
+            <div className={`border p-2 flex flex-col gap-0.5 ${
+              selectedSystem.status === "RELOCATING"
+                ? "border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400 animate-pulse"
+                : "border-cyan-500/40 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400"
+            }`}>
               <span className="text-[8px] theme-text-muted">TRYB PRACY TARCZY</span>
-              <span className="font-bold tracking-wider">AKTYWNY / SKANOWANIE</span>
+              <span className="font-bold tracking-wider font-mono">
+                {selectedSystem.status === "RELOCATING" 
+                  ? `MARSZ (${selectedSystem.relocationSecondsLeft}S)` 
+                  : "SKANOWANIE / AKTYWNY"}
+              </span>
             </div>
             <div className="border theme-border theme-bg-app p-2 flex flex-col gap-0.5 theme-text-primary">
               <span className="text-[8px] theme-text-muted">LOKACJA TARCZY</span>
               <span className="font-semibold">{selectedSystem.lat.toFixed(5)}°N, {selectedSystem.lon.toFixed(5)}°E</span>
             </div>
           </div>
+
+          {selectedSystem.status === "RELOCATING" && (
+            <div className="bg-amber-500/10 border border-amber-500/30 p-2 text-[9px] text-amber-500 leading-normal animate-pulse">
+              <span className="font-bold">STATUS MARSZU:</span> Bateria jest w trakcie relokacji taktycznej. Wszystkie systemy bojowe są wyłączone do czasu dotarcia do celu.
+            </div>
+          )}
 
           <div className="theme-bg-app p-3 border theme-border text-[10px] space-y-2 theme-text-secondary">
             <div className="flex justify-between">
@@ -348,29 +426,94 @@ export function ObjectDetailCard({
                 {WEAPONS.find(w => w.type === selectedSystem.type)?.threatsCovered.join(", ")}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span>Sygnatura WebGL:</span>
-              <span className="font-bold theme-neon-text">Cesium dynamic GridSphere Primitive</span>
+            {selectedSystem.status === "RELOCATING" && selectedSystem.targetLat && selectedSystem.targetLon && (
+              <div className="flex justify-between border-t border-slate-700/30 pt-1 text-[9px] text-amber-500">
+                <span>Współrzędne docelowe:</span>
+                <span className="font-bold">{selectedSystem.targetLat.toFixed(4)}°N, {selectedSystem.targetLon.toFixed(4)}°E</span>
+              </div>
+            )}
+          </div>
+
+          {/* Action buttons (only show if not relocating and form not open) */}
+          {!isRelocatingFormOpen && selectedSystem.status !== "RELOCATING" && (
+            <div className="grid grid-cols-3 gap-2 mt-1">
+              <button
+                onClick={() => onFlyTo(selectedSystem.lat, selectedSystem.lon, selectedSystem.name)}
+                className="py-2 border theme-border theme-bg-button hover:theme-bg-button-hover theme-text-primary hover:theme-neon-text transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+                NAMIERZ GPS
+              </button>
+
+              <button
+                onClick={() => setIsRelocatingFormOpen(true)}
+                className="py-2 border border-cyan-550/40 bg-cyan-500/5 text-cyan-400 hover:bg-cyan-550/20 hover:text-cyan-300 transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                PRZEMIEŚĆ
+              </button>
+
+              <button
+                onClick={() => onRemoveSystem(selectedSystem.id)}
+                className="py-2 border border-red-500/60 dark:border-red-950/60 bg-red-500/10 dark:bg-red-950/10 hover:bg-red-650 dark:hover:bg-red-950 hover:text-white dark:hover:text-red-200 text-red-700 dark:text-red-400 transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                ZDEMONTUJ
+              </button>
             </div>
-          </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-2 mt-1">
-            <button
-              onClick={() => onFlyTo(selectedSystem.lat, selectedSystem.lon, selectedSystem.name)}
-              className="py-2 border theme-border theme-bg-button hover:theme-bg-button-hover theme-text-primary hover:theme-neon-text transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Navigation className="w-3.5 h-3.5" />
-              NAMIERZ GPS
-            </button>
+          {/* Relocation Config Form */}
+          {isRelocatingFormOpen && (
+            <div className="mt-1 pt-2.5 border-t border-cyan-500/20 flex flex-col gap-2 bg-black/10 p-2 rounded">
+              <span className="text-[8px] text-cyan-400 font-bold uppercase tracking-wider">
+                KONFIGURACJA TRASY PRZEMIESZCZENIA
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col flex-1">
+                  <label className="text-[7.5px] theme-text-muted">SZEROKOŚĆ (LAT)</label>
+                  <input
+                    type="text"
+                    value={targetLat}
+                    onChange={(e) => setTargetLat(e.target.value)}
+                    className="w-full theme-bg-panel border border-slate-700 p-1 text-[9px] font-mono text-cyan-300 outline-none focus:border-cyan-500"
+                  />
+                </div>
+                <div className="flex flex-col flex-1">
+                  <label className="text-[7.5px] theme-text-muted">DŁUGOŚĆ (LON)</label>
+                  <input
+                    type="text"
+                    value={targetLon}
+                    onChange={(e) => setTargetLon(e.target.value)}
+                    className="w-full theme-bg-panel border border-slate-700 p-1 text-[9px] font-mono text-cyan-300 outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
 
-            <button
-              onClick={() => onRemoveSystem(selectedSystem.id)}
-              className="py-2 border border-red-500/60 dark:border-red-950/60 bg-red-500/10 dark:bg-red-950/10 hover:bg-red-650 dark:hover:bg-red-950 hover:text-white dark:hover:text-red-200 text-red-700 dark:text-red-400 transition-all font-semibold font-rajdhani text-[11px] flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              ZDEMONTUJ SYSTEM
-            </button>
-          </div>
+              {/* Distance & Time Estimate */}
+              {est && (
+                <div className="p-1 px-2 bg-cyan-950/20 border border-cyan-500/20 text-[8px] font-mono theme-text-secondary flex justify-between">
+                  <span>DYSTANS: {est.distance} KM</span>
+                  <span className="text-cyan-400 font-bold">EST. CZAS: {est.seconds} SEKUND</span>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  onClick={handleConfirmRelocation}
+                  className="px-2.5 py-1.5 border border-emerald-500 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/25 transition-all font-bold text-[9px] clip-chamfer cursor-pointer flex items-center gap-1"
+                >
+                  ZATWIERDŹ MARSZ
+                </button>
+                <button
+                  onClick={() => setIsRelocatingFormOpen(false)}
+                  className="px-2 py-1.5 border border-slate-600 bg-slate-500/10 text-slate-400 hover:bg-slate-550/25 transition-all font-bold text-[9px] clip-chamfer cursor-pointer flex items-center gap-1 ml-auto"
+                >
+                  ANULUJ
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
