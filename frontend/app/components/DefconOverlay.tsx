@@ -49,7 +49,7 @@ export function DefconOverlay({ defcon }: DefconOverlayProps) {
   const isCritical = defcon <= 3;
 
   return (
-    <div className="fixed inset-0 z-[50] pointer-events-none select-none flex flex-col items-center">
+    <div className="fixed inset-0 z-[50] pointer-events-none select-none flex justify-center">
       {/* Subtly pulsed screen-edge vignette (pure visual overlay, no clicks blocked) */}
       <div 
         className={`absolute inset-0 transition-opacity duration-1000 pointer-events-none ${
@@ -60,7 +60,7 @@ export function DefconOverlay({ defcon }: DefconOverlayProps) {
       />
 
       {/* Futuristic, non-blocking Top-Center Alert Ribbon (only this bar captures hover/clicks) */}
-      <div className="mt-14 w-[420px] theme-bg-panel border border-red-500/40 p-2 py-1.5 px-3.5 clip-chamfer shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-md flex items-center justify-between gap-3 animate-slideDown pointer-events-auto relative">
+      <div className="absolute top-[78px] w-[420px] theme-bg-panel border border-red-500/40 p-2 py-1.5 px-3.5 clip-chamfer shadow-[0_4px_20px_rgba(0,0,0,0.6)] backdrop-blur-md flex items-center justify-between gap-3 animate-slideDown pointer-events-auto relative">
         {/* Sleek tactical left bar indicator */}
         <div className={`absolute top-0 bottom-0 left-0 w-1 ${isCritical ? "bg-red-500 animate-pulse" : "bg-amber-500"}`} />
 
