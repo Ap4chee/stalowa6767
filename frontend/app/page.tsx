@@ -86,6 +86,42 @@ export default function SteelSentinelDashboard() {
     localStorage.setItem("steel-sentinel-theme", theme);
   }, [theme]);
 
+  // Load nodes and relations from localStorage on client mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedNodes = localStorage.getItem("sentinel_nodes");
+      if (savedNodes) {
+        try {
+          setNodes(JSON.parse(savedNodes));
+        } catch (e) {
+          console.error("Failed to parse saved nodes:", e);
+        }
+      }
+      const savedRelations = localStorage.getItem("sentinel_relations");
+      if (savedRelations) {
+        try {
+          setRelations(JSON.parse(savedRelations));
+        } catch (e) {
+          console.error("Failed to parse saved relations:", e);
+        }
+      }
+    }
+  }, []);
+
+  // Save nodes to localStorage on update
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sentinel_nodes", JSON.stringify(nodes));
+    }
+  }, [nodes]);
+
+  // Save relations to localStorage on update
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sentinel_relations", JSON.stringify(relations));
+    }
+  }, [relations]);
+
   const [selectedNode, setSelectedNode] = useState<CriticalNode | null>(null);
   const [selectedSystem, setSelectedSystem] = useState<DeployedSystem | null>(null);
 

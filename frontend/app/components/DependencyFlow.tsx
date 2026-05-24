@@ -248,19 +248,54 @@ export function DependencyFlow({
 
   // Construct initial flow nodes state (only runs once on mount)
   const initialNodes = React.useMemo<Node[]>(() => {
+    let savedPositions: Record<string, { x: number; y: number }> = {};
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("sentinel_node_positions");
+      if (stored) {
+        try {
+          savedPositions = JSON.parse(stored);
+        } catch (e) {
+          console.error("Failed to parse saved positions:", e);
+        }
+      }
+    }
+
     return nodes.map((node) => ({
       id: node.id,
       type: "criticalNode",
-      position: INITIAL_NODE_POSITIONS[node.id] || { x: 100, y: 100 },
+      position: savedPositions[node.id] || INITIAL_NODE_POSITIONS[node.id] || { x: 100, y: 100 },
       data: { node, onFlyTo }
     }));
-  }, [onFlyTo]);
+  }, [nodes, onFlyTo]);
 
   const [flowNodes, setFlowNodes, onNodesChange] = useNodesState(initialNodes);
+
+  // Save node coordinates to localStorage on update
+  useEffect(() => {
+    if (typeof window !== "undefined" && flowNodes.length > 0) {
+      const positions: Record<string, { x: number; y: number }> = {};
+      flowNodes.forEach((fn) => {
+        positions[fn.id] = fn.position;
+      });
+      localStorage.setItem("sentinel_node_positions", JSON.stringify(positions));
+    }
+  }, [flowNodes]);
 
   // Synchronize parent state nodes dynamically (including appending newly registered nodes)
   useEffect(() => {
     setFlowNodes((prevNodes) => {
+      let savedPositions: Record<string, { x: number; y: number }> = {};
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("sentinel_node_positions");
+        if (stored) {
+          try {
+            savedPositions = JSON.parse(stored);
+          } catch (e) {
+            console.error("Failed to parse saved positions:", e);
+          }
+        }
+      }
+
       const updatedNodes = prevNodes.map((fn) => {
         const matching = nodes.find((n) => n.id === fn.id);
         if (matching) {
@@ -282,7 +317,7 @@ export function DependencyFlow({
         return {
           id: n.id,
           type: "criticalNode",
-          position: INITIAL_NODE_POSITIONS[n.id] || { x: xPos, y: yPos },
+          position: savedPositions[n.id] || INITIAL_NODE_POSITIONS[n.id] || { x: xPos, y: yPos },
           data: { node: n, onFlyTo }
         };
       });
