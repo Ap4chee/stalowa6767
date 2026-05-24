@@ -3,7 +3,103 @@
 import { Suspense, useState, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Environment, ContactShadows, Center } from "@react-three/drei";
-import { Crosshair, RotateCcw, ZoomIn, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Crosshair, RotateCcw, ZoomIn, Eye, ChevronLeft, ChevronRight, X, Shield, Zap, Radio, Rocket } from "lucide-react";
+
+// ---- Countermeasure database ----
+const COUNTERMEASURE_DB: Record<string, {
+  name: string;
+  type: string;
+  icon: "shield" | "zap" | "radio" | "rocket";
+  range: string;
+  effectiveness: string;
+  description: string;
+  specs: { label: string; value: string }[];
+}> = {
+  "PILICA+": {
+    name: "PSR-A PILICA+",
+    type: "SYSTEM ARTYLERYJSKO-RAKIETOWY VSHORAD",
+    icon: "zap",
+    range: "5 km",
+    effectiveness: "95%",
+    description: "Zintegrowany system obrony przeciwlotniczej krótkiego zasięgu. Łączy podwójne działka ZU-23-2 (23mm) z wyrzutniami rakiet GROM/PIORUN. Zdolność do automatycznego śledzenia i zestrzeliwania dronów, amunicji krążącej oraz pocisków manewrujących na niskim pułapie.",
+    specs: [
+      { label: "KALIBER", value: "23mm (2xZU-23-2)" },
+      { label: "RAKIETY", value: "4x GROM/PIORUN" },
+      { label: "RADAR", value: "Zintegrowany IRSM" },
+      { label: "CZAS REAKCJI", value: "4-6 sekund" },
+    ]
+  },
+  "ZRN-01 WRE": {
+    name: "ZRN-01 TAJFUN WRE",
+    type: "MOBILNY SYSTEM WALKI RADIOELEKTRONICZNEJ",
+    icon: "radio",
+    range: "2 km",
+    effectiveness: "80% (drony cywilne)",
+    description: "Mobilna stacja zakłócania radioelektronicznego pasm GPS/GLONASS i łączy C2 (2.4/5.8 GHz). Skutecznie neutralizuje drony komercyjne klasy I poprzez przerwanie łącza z operatorem i zakłócanie nawigacji satelitarnej.",
+    specs: [
+      { label: "PASMA", value: "GPS/GLONASS/C2" },
+      { label: "MOC", value: "50W per kanał" },
+      { label: "ANTENA", value: "Kierunkowa 60°" },
+      { label: "MOBILNOŚĆ", value: "Na pojeździe 4x4" },
+    ]
+  },
+  "RADAR OBSERWACJI": {
+    name: "RADAR MAŁOGABARYTOWY OBSERWACJI",
+    type: "RADAR DOPPLEROWSKI WCZESNEGO OSTRZEGANIA",
+    icon: "radio",
+    range: "3.5 km (LSS)",
+    effectiveness: "Wykrywanie 99%",
+    description: "Kompaktowy radar dopplerowski zoptymalizowany do wykrywania celów o niskiej sygnaturze radarowej (LSS). Automatycznie klasyfikuje cele w oparciu o micro-doppler (rozróżnianie dronów od ptaków). Współpracuje bezpośrednio z systemem PILICA+ w pętli sensorowo-efektorowej.",
+    specs: [
+      { label: "ZASIĘG LSS", value: "do 3.5 km" },
+      { label: "ROZDZIELCZOŚĆ", value: "0.5° azymut" },
+      { label: "OBROTY", value: "30 RPM" },
+      { label: "CELE ŚLEDZONE", value: "do 200" },
+    ]
+  },
+  "PPZR PIORUN": {
+    name: "PPZR GROM PIORUN",
+    type: "PRZENOŚNY PRZECIWLOTNICZY ZESTAW RAKIETOWY",
+    icon: "rocket",
+    range: "6.5 km",
+    effectiveness: "90%",
+    description: "Polskie MANPADS nowej generacji z głowicą samonaprowadzającą IIR (dwuzakresowa podczerwień). Zdolny do przechwycenia celów na tle ziemi i w warunkach silnych zakłóceń. Wyposażony w chłodzony detektor z możliwością pracy w trybie dziennym i nocnym.",
+    specs: [
+      { label: "MASA", value: "16.5 kg (gotowy)" },
+      { label: "GŁOWICA", value: "IIR dwuzakresowa" },
+      { label: "PUŁAP", value: "10-4000m" },
+      { label: "PRĘDKOŚĆ", value: "Mach 1.6+" },
+    ]
+  },
+  "ZU-23-2": {
+    name: "ARMATA PLOT ZU-23-2",
+    type: "PODWÓJNE DZIAŁKO PRZECIWLOTNICZE 23MM",
+    icon: "zap",
+    range: "2.5 km",
+    effectiveness: "70%",
+    description: "Radziecka podwójna armata przeciwlotnicza kal. 23mm. Szybkostrzelność 2000 strz./min łącznie. Pomimo prostej konstrukcji, nadal skuteczna przeciwko nisko latającym dronom i amunicji krążącej na bliskim dystansie. Używana jako ostatnia linia obrony.",
+    specs: [
+      { label: "KALIBER", value: "2x 23mm" },
+      { label: "SZYBKOSTR.", value: "2000 strz./min" },
+      { label: "PUŁAP SKUTECZNY", value: "1500m" },
+      { label: "MASA", value: "950 kg" },
+    ]
+  },
+  "N/D — SYSTEM OBRONNY": {
+    name: "SYSTEM SOJUSZNICZY",
+    type: "OBIEKT WŁASNEJ OBRONY",
+    icon: "shield",
+    range: "N/D",
+    effectiveness: "N/D",
+    description: "Ten obiekt jest elementem własnych sił obronnych i nie wymaga środków przeciwdziałania. Stanowi kluczowy komponent tarczy antyrakietowej chroniącej infrastrukturę krytyczną Stalowej Woli.",
+    specs: [
+      { label: "KLASYFIKACJA", value: "SOJUSZNICZY" },
+      { label: "ROLA", value: "OBRONA AKTYWNA" },
+      { label: "STATUS", value: "OPERACYJNY" },
+      { label: "PRIORYTET", value: "KRYTYCZNY" },
+    ]
+  }
+};
 
 // ---- Threat catalog with model paths and metadata ----
 const THREAT_CATALOG = [
@@ -54,6 +150,76 @@ const THREAT_CATALOG = [
   }
 ];
 
+// ---- Countermeasure Icon helper ----
+function CountermeasureIcon({ type }: { type: string }) {
+  switch (type) {
+    case "shield": return <Shield className="w-4 h-4" />;
+    case "zap": return <Zap className="w-4 h-4" />;
+    case "radio": return <Radio className="w-4 h-4" />;
+    case "rocket": return <Rocket className="w-4 h-4" />;
+    default: return <Shield className="w-4 h-4" />;
+  }
+}
+
+// ---- Countermeasure Detail Modal ----
+function CountermeasureModal({ cmKey, onClose }: { cmKey: string; onClose: () => void }) {
+  const cm = COUNTERMEASURE_DB[cmKey];
+  if (!cm) return null;
+
+  return (
+    <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className="w-[90%] max-w-[300px] theme-bg-panel border theme-border rounded-lg shadow-2xl overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-3 py-2 border-b theme-border bg-emerald-500/5">
+          <div className="flex items-center gap-2 theme-neon-text">
+            <CountermeasureIcon type={cm.icon} />
+            <span className="text-[10px] font-bold font-rajdhani tracking-widest">{cm.name}</span>
+          </div>
+          <button onClick={onClose} className="p-0.5 theme-text-muted hover:text-red-500 transition-all cursor-pointer">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-3 space-y-3">
+          <div>
+            <div className="text-[7px] font-bold font-rajdhani tracking-widest theme-text-muted">TYP SYSTEMU</div>
+            <div className="text-[9px] font-bold font-rajdhani theme-text-primary mt-0.5">{cm.type}</div>
+          </div>
+
+          <div className="flex gap-2">
+            <div className="flex-1 p-1.5 theme-bg-app border theme-border rounded text-center">
+              <div className="text-[7px] font-bold font-rajdhani tracking-widest theme-text-muted">ZASIĘG</div>
+              <div className="text-[10px] font-bold font-sharetech theme-neon-text">{cm.range}</div>
+            </div>
+            <div className="flex-1 p-1.5 theme-bg-app border theme-border rounded text-center">
+              <div className="text-[7px] font-bold font-rajdhani tracking-widest theme-text-muted">SKUTECZNOŚĆ</div>
+              <div className="text-[10px] font-bold font-sharetech text-emerald-500">{cm.effectiveness}</div>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[7px] font-bold font-rajdhani tracking-widest theme-text-muted mb-1">OPIS</div>
+            <p className="text-[9px] theme-text-secondary leading-relaxed font-mono">{cm.description}</p>
+          </div>
+
+          <div>
+            <div className="text-[7px] font-bold font-rajdhani tracking-widest theme-text-muted mb-1.5">SPECYFIKACJA</div>
+            <div className="grid grid-cols-2 gap-1">
+              {cm.specs.map(({ label, value }) => (
+                <div key={label} className="p-1.5 theme-bg-app border theme-border rounded">
+                  <div className="text-[6px] font-bold font-rajdhani tracking-widest theme-text-muted">{label}</div>
+                  <div className="text-[9px] font-bold font-sharetech theme-text-primary mt-0.5">{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- 3D Model component ----
 function ThreatModel({ modelPath }: { modelPath: string }) {
   const { scene } = useGLTF(modelPath);
@@ -84,6 +250,7 @@ interface ThreatModelViewerProps {
 export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [autoRotate, setAutoRotate] = useState(true);
+  const [selectedCM, setSelectedCM] = useState<string | null>(null);
   const controlsRef = useRef<any>(null);
 
   if (!isOpen) return null;
@@ -92,10 +259,12 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
 
   const handlePrev = () => {
     setSelectedIndex((prev) => (prev - 1 + THREAT_CATALOG.length) % THREAT_CATALOG.length);
+    setSelectedCM(null);
   };
 
   const handleNext = () => {
     setSelectedIndex((prev) => (prev + 1) % THREAT_CATALOG.length);
+    setSelectedCM(null);
   };
 
   const handleResetCamera = () => {
@@ -221,8 +390,13 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
           </div>
 
           {/* Right: Info panel */}
-          <div className="w-[340px] border-l theme-border flex flex-col theme-bg-panel">
+          <div className="w-[340px] border-l theme-border flex flex-col theme-bg-panel relative">
             
+            {/* Countermeasure detail modal overlay */}
+            {selectedCM && (
+              <CountermeasureModal cmKey={selectedCM} onClose={() => setSelectedCM(null)} />
+            )}
+
             {/* Threat selector */}
             <div className="flex items-center justify-between px-4 py-2.5 border-b theme-border">
               <button
@@ -296,16 +470,33 @@ export function ThreatModelViewer({ isOpen, onClose }: ThreatModelViewerProps) {
                 </p>
               </div>
 
-              {/* Countermeasures */}
+              {/* Countermeasures - now clickable cards */}
               <div>
                 <div className="text-[8px] font-bold font-rajdhani tracking-widest theme-text-muted mb-2">ŚRODKI PRZECIWDZIAŁANIA</div>
-                <div className="space-y-1">
-                  {threat.countermeasures.map((cm) => (
-                    <div key={cm} className="flex items-center gap-2 text-[10px] font-mono">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span className="theme-text-primary font-semibold">{cm}</span>
-                    </div>
-                  ))}
+                <div className="space-y-1.5">
+                  {threat.countermeasures.map((cm) => {
+                    const cmData = COUNTERMEASURE_DB[cm];
+                    return (
+                      <button
+                        key={cm}
+                        onClick={() => setSelectedCM(cm)}
+                        className="w-full flex items-center gap-2.5 p-2 theme-bg-app border theme-border rounded hover:theme-neon-border hover:bg-cyan-500/5 transition-all cursor-pointer text-left group"
+                      >
+                        <div className="w-7 h-7 rounded flex items-center justify-center theme-bg-panel border theme-border group-hover:theme-neon-border group-hover:theme-neon-text theme-text-muted transition-all shrink-0">
+                          {cmData && <CountermeasureIcon type={cmData.icon} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[9px] font-bold font-rajdhani theme-text-primary group-hover:theme-neon-text transition-all truncate">{cm}</div>
+                          {cmData && (
+                            <div className="text-[7px] theme-text-muted font-mono truncate">{cmData.type}</div>
+                          )}
+                        </div>
+                        <div className="text-[7px] theme-text-muted font-rajdhani font-bold tracking-wider shrink-0">
+                          SZCZEGÓŁY →
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>

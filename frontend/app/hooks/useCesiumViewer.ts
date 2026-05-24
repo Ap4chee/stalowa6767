@@ -486,35 +486,76 @@ export function useCesiumViewer({
 
         const deployedGlassColor = Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.25);
 
-        // 1. Sleek launch tower
-        viewer.entities.add({
-          id: newSys.id + "_tower",
-          position: Cesium.Cartesian3.fromDegrees(lon, lat, 20),
-          cylinder: {
-            length: 40, topRadius: 10, bottomRadius: 12,
-            slices: 5,
-            material: deployedGlassColor,
-            outline: false
-          }
-        });
+        if (activeWeapon === "PATRIOT") {
+          // Render actual 3D GLB model for Patriot
+          const heading = Cesium.Math.toRadians(0);
+          const pitch = 0;
+          const roll = 0;
+          const hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
+          const position = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+          const orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
 
-        // 2. Tactical Vertical Beacon Line
-        viewer.entities.add({
-          id: newSys.id + "_beacon",
-          polyline: {
-            positions: Cesium.Cartesian3.fromDegreesArrayHeights([
-              lon, lat, 0,
-              lon, lat, 70
-            ]),
-            width: 1.5,
-            material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.8)
-          }
-        });
+          viewer.entities.add({
+            id: newSys.id + "_model",
+            position: position,
+            orientation: orientation as any,
+            model: {
+              uri: "/3d_models/patriot.glb",
+              scale: 25,
+              minimumPixelSize: 64,
+              maximumScale: 50,
+              silhouetteColor: Cesium.Color.fromCssColorString(newSys.color),
+              silhouetteSize: 1.5,
+              colorBlendMode: Cesium.ColorBlendMode.MIX,
+              colorBlendAmount: 0.1,
+              color: Cesium.Color.WHITE
+            }
+          });
 
-        // 3. Primary Label
+          // Taller beacon for Patriot
+          viewer.entities.add({
+            id: newSys.id + "_beacon",
+            polyline: {
+              positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+                lon, lat, 0,
+                lon, lat, 120
+              ]),
+              width: 2,
+              material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.8)
+            }
+          });
+        } else {
+          // Generic tower for other weapons
+          viewer.entities.add({
+            id: newSys.id + "_tower",
+            position: Cesium.Cartesian3.fromDegrees(lon, lat, 20),
+            cylinder: {
+              length: 40, topRadius: 10, bottomRadius: 12,
+              slices: 5,
+              material: deployedGlassColor,
+              outline: false
+            }
+          });
+
+          // Tactical Vertical Beacon Line
+          viewer.entities.add({
+            id: newSys.id + "_beacon",
+            polyline: {
+              positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+                lon, lat, 0,
+                lon, lat, 70
+              ]),
+              width: 1.5,
+              material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.8)
+            }
+          });
+        }
+
+        // Primary Label (always)
+        const labelHeight = activeWeapon === "PATRIOT" ? 130 : 70;
         viewer.entities.add({
           id: newSys.id + "_label",
-          position: Cesium.Cartesian3.fromDegrees(lon, lat, 70),
+          position: Cesium.Cartesian3.fromDegrees(lon, lat, labelHeight),
           label: {
             text: newSys.name.toUpperCase(),
             font: "bold 38px Share Tech Mono, monospace",
