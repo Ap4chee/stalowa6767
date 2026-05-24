@@ -20,6 +20,7 @@ import { TelemetryHUD } from "./components/TelemetryHUD";
 import { ObjectDetailCard } from "./components/ObjectDetailCard";
 import { DependencyFlow } from "./components/DependencyFlow";
 import { ThreatModelViewer } from "./components/ThreatModelViewer";
+import { DefconOverlay } from "./components/DefconOverlay";
 
 export default function SteelSentinelDashboard() {
   const [nodes, setNodes] = useState<CriticalNode[]>(INITIAL_NODES);
@@ -545,6 +546,7 @@ export default function SteelSentinelDashboard() {
         isOpen={threatViewerOpen}
         onClose={() => setThreatViewerOpen(false)}
       />
+      <DefconOverlay defcon={defcon} />
     </div>
   );
 }

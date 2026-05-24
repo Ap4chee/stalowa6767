@@ -65,19 +65,29 @@ export function Header({
           <span>BAZA OBIEKTÓW 3D</span>
         </button>
         {(() => {
-          const threatLevel = 6 - defcon;
+          const colors: Record<number, string> = {
+            5: "border-emerald-500 bg-emerald-500/10 text-emerald-500",
+            4: "border-cyan-550 bg-cyan-500/10 text-cyan-400",
+            3: "border-amber-400 bg-amber-500/10 text-amber-500",
+            2: "border-orange-550 bg-orange-550/10 text-orange-550 animate-pulse",
+            1: "border-red-600 bg-red-500/10 text-red-500 animate-pulse font-bold"
+          };
+
+          const dotColors: Record<number, string> = {
+            5: "bg-emerald-500",
+            4: "bg-cyan-400",
+            3: "bg-amber-400",
+            2: "bg-orange-500",
+            1: "bg-red-550"
+          };
+
+          const colorClass = colors[defcon] || colors[5];
+          const dotColorClass = dotColors[defcon] || dotColors[5];
+
           return (
-            <div className={`flex items-center gap-2 px-3 py-1 border transition-all ${threatLevel === 5
-              ? "border-red-600 bg-red-500/10 text-red-500 animate-pulse font-bold"
-              : threatLevel === 4
-                ? "border-orange-500 bg-orange-500/10 text-orange-500 animate-pulse"
-                : threatLevel === 3
-                  ? "border-amber-400 bg-amber-500/10 text-amber-500"
-                  : "border-emerald-500 bg-emerald-500/10 text-emerald-500"
-              }`}>
-              <span className="text-[10px] font-bold tracking-widest">ZAGROŻENIE {threatLevel}</span>
-              <span className={`w-2 h-2 rounded-full ${threatLevel === 5 ? "bg-red-500" : threatLevel === 4 ? "bg-orange-500" : threatLevel === 3 ? "bg-amber-400" : "bg-emerald-500"
-                }`} />
+            <div className={`flex items-center gap-2 px-3 py-1 border transition-all ${colorClass}`}>
+              <span className="text-[10px] font-bold tracking-widest font-sharetech">DEFCON {defcon}</span>
+              <span className={`w-2 h-2 rounded-full ${dotColorClass}`} />
             </div>
           );
         })()}
