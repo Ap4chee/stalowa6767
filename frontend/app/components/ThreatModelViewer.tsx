@@ -147,6 +147,21 @@ const THREAT_CATALOG = [
     description: "Amerykański system obrony przeciwlotniczej i przeciwrakietowej dalekiego zasięgu. Radar AN/MPQ-65 zapewnia śledzenie 100+ celów jednocześnie. Pocisk PAC-3 MSE wykorzystuje technologię kinetycznego przechwycenia (hit-to-kill).",
     countermeasures: ["N/D — SYSTEM OBRONNY"],
     cameraDistance: 8,
+  },
+  {
+    id: "pilica",
+    name: "PSR-A Pilica",
+    designation: "PSR-A PILICA / PILICA+",
+    classification: "SYSTEM VSHORAD",
+    modelPath: "/3d_models/pilica.glb",
+    speed: "1000 strz./min (armaty)",
+    range: "5-6.5 km",
+    altitude: "do 4000m",
+    payload: "23mm pociski, 2x rakiety Piorun",
+    threat: "SOJUSZNICZY",
+    description: "Polski Przeciwlotniczy System Rakietowo-Artyleryjski bardzo krótkiego zasięgu (VSHORAD). Integruje podwójną armatę automatyczną kalibru 23 mm oraz dwie wyrzutnie rakiet PPZR Piorun. Zaprojektowany do osłony baz lotniczych i innych kluczowych obiektów przed bezzałogowcami, śmigłowcami i pociskami manewrującymi.",
+    countermeasures: ["N/D — SYSTEM OBRONNY"],
+    cameraDistance: 12,
   }
 ];
 

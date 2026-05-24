@@ -524,6 +524,44 @@ export function useCesiumViewer({
               material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.8)
             }
           });
+        } else if (activeWeapon === "PILICA") {
+          // Render actual 3D GLB model for Pilica
+          const heading = Cesium.Math.toRadians(0);
+          const pitch = 0;
+          const roll = 0;
+          const hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
+          const position = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+          const orientation = Cesium.Transforms.headingPitchRollQuaternion(position, hpr);
+
+          viewer.entities.add({
+            id: newSys.id + "_model",
+            position: position,
+            orientation: orientation as any,
+            model: {
+              uri: "/3d_models/pilica.glb",
+              scale: 30,
+              minimumPixelSize: 64,
+              maximumScale: 50,
+              silhouetteColor: Cesium.Color.fromCssColorString(newSys.color),
+              silhouetteSize: 1.5,
+              colorBlendMode: Cesium.ColorBlendMode.MIX,
+              colorBlendAmount: 0.1,
+              color: Cesium.Color.WHITE
+            }
+          });
+
+          // Custom beacon for Pilica
+          viewer.entities.add({
+            id: newSys.id + "_beacon",
+            polyline: {
+              positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+                lon, lat, 0,
+                lon, lat, 100
+              ]),
+              width: 2,
+              material: Cesium.Color.fromCssColorString(newSys.color).withAlpha(0.8)
+            }
+          });
         } else {
           // Generic tower for other weapons
           viewer.entities.add({
@@ -552,7 +590,7 @@ export function useCesiumViewer({
         }
 
         // Primary Label (always)
-        const labelHeight = activeWeapon === "PATRIOT" ? 130 : 70;
+        const labelHeight = activeWeapon === "PATRIOT" ? 130 : activeWeapon === "PILICA" ? 110 : 70;
         viewer.entities.add({
           id: newSys.id + "_label",
           position: Cesium.Cartesian3.fromDegrees(lon, lat, labelHeight),
