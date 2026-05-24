@@ -16,9 +16,17 @@ interface TelemetryHUDProps {
     hydrology: boolean;
   };
   onToggleLayer: (key: keyof TelemetryHUDProps["mapLayers"]) => void;
+  baseMapType: "standard" | "satellite" | "topo";
+  onSetBaseMapType: (type: "standard" | "satellite" | "topo") => void;
 }
 
-export function TelemetryHUD({ hoveredCoords, mapLayers, onToggleLayer }: TelemetryHUDProps) {
+export function TelemetryHUD({
+  hoveredCoords,
+  mapLayers,
+  onToggleLayer,
+  baseMapType,
+  onSetBaseMapType
+}: TelemetryHUDProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -160,6 +168,42 @@ export function TelemetryHUD({ hoveredCoords, mapLayers, onToggleLayer }: Teleme
               }`} />
             </div>
           </button>
+          {/* Base Map Style Selector */}
+          <div className="border-t theme-border pt-2.5 mt-1 space-y-1.5">
+            <span className="text-[8px] theme-text-muted font-bold font-rajdhani tracking-wider block">STYL PODKŁADU MAPY</span>
+            <div className="grid grid-cols-3 gap-1 bg-slate-950/60 p-0.5 rounded border theme-border">
+              <button
+                onClick={() => onSetBaseMapType("standard")}
+                className={`py-1 text-[8px] font-bold tracking-wider rounded transition-all cursor-pointer text-center ${
+                  baseMapType === "standard"
+                    ? "bg-cyan-500/20 theme-neon-text border border-cyan-500/30"
+                    : "theme-text-muted hover:theme-text-primary border border-transparent"
+                }`}
+              >
+                STANDARD
+              </button>
+              <button
+                onClick={() => onSetBaseMapType("satellite")}
+                className={`py-1 text-[8px] font-bold tracking-wider rounded transition-all cursor-pointer text-center ${
+                  baseMapType === "satellite"
+                    ? "bg-cyan-500/20 theme-neon-text border border-cyan-500/30"
+                    : "theme-text-muted hover:theme-text-primary border border-transparent"
+                }`}
+              >
+                SATELITA
+              </button>
+              <button
+                onClick={() => onSetBaseMapType("topo")}
+                className={`py-1 text-[8px] font-bold tracking-wider rounded transition-all cursor-pointer text-center ${
+                  baseMapType === "topo"
+                    ? "bg-cyan-500/20 theme-neon-text border border-cyan-500/30"
+                    : "theme-text-muted hover:theme-text-primary border border-transparent"
+                }`}
+              >
+                TOPO
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

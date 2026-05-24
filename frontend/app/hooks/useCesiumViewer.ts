@@ -32,6 +32,7 @@ interface UseCesiumViewerOptions {
   mapLayers: MapLayersState;
   nodes: CriticalNode[];
   relations: NodeRelation[];
+  baseMapType?: "standard" | "satellite" | "topo";
 }
 
 export function useCesiumViewer({
@@ -50,7 +51,8 @@ export function useCesiumViewer({
   theme = "light",
   mapLayers,
   nodes,
-  relations
+  relations,
+  baseMapType = "standard"
 }: UseCesiumViewerOptions) {
   const viewerRef = useRef<any>(null);
   const nodeEntitiesRef = useRef<{ [id: string]: any }>({});
@@ -893,16 +895,32 @@ export function useCesiumViewer({
     // 1. Remove all old layers
     viewer.imageryLayers.removeAll();
 
-    // 2. Add the dynamic light/dark CartoDB tiles
-    const url = theme === "dark"
-      ? "https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png"
-      : "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png";
+    // 2. Select appropriate tile server based on baseMapType
+    let url = "";
+    let credit = "";
+    let maxLvl = 19;
+
+    if (baseMapType === "satellite") {
+      url = "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+      credit = "Esri World Imagery";
+      maxLvl = 19;
+    } else if (baseMapType === "topo") {
+      url = "https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
+      credit = "Esri World Topo Map";
+      maxLvl = 19;
+    } else {
+      url = theme === "dark"
+        ? "https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png"
+        : "https://basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png";
+      credit = "CartoDB";
+      maxLvl = 19;
+    }
 
     viewer.imageryLayers.addImageryProvider(
       new Cesium.UrlTemplateImageryProvider({
         url,
-        credit: "CartoDB",
-        maximumLevel: 19
+        credit,
+        maximumLevel: maxLvl
       })
     );
 
@@ -910,7 +928,7 @@ export function useCesiumViewer({
     viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString(
       theme === "dark" ? "#020617" : "#f8fafc"
     );
-  }, [theme, isCesiumLoaded]);
+  }, [theme, baseMapType, isCesiumLoaded]);
 
   return {
     viewerRef,

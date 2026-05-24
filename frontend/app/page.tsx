@@ -51,6 +51,18 @@ export default function SteelSentinelDashboard() {
   const [schemaModeEnabled, setSchemaModeEnabled] = useState(false);
   const [threatViewerOpen, setThreatViewerOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [baseMapType, setBaseMapType] = useState<"standard" | "satellite" | "topo">("standard");
+
+  useEffect(() => {
+    const savedType = localStorage.getItem("steel-sentinel-basemap") as any;
+    if (savedType === "standard" || savedType === "satellite" || savedType === "topo") {
+      setBaseMapType(savedType);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("steel-sentinel-basemap", baseMapType);
+  }, [baseMapType]);
   const [mapLayers, setMapLayers] = useState({
     baseMap: true,
     nodes: true,
@@ -189,7 +201,8 @@ export default function SteelSentinelDashboard() {
     theme,
     mapLayers,
     nodes,
-    relations
+    relations,
+    baseMapType
   });
 
   useEffect(() => {
@@ -515,6 +528,8 @@ export default function SteelSentinelDashboard() {
           hoveredCoords={hoveredCoords} 
           mapLayers={mapLayers}
           onToggleLayer={handleToggleLayer}
+          baseMapType={baseMapType}
+          onSetBaseMapType={setBaseMapType}
         />
       )}
 
