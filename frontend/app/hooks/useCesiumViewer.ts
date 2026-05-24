@@ -789,6 +789,15 @@ export function useCesiumViewer({
       return positions;
     };
 
+    // Pre-calculate pairs to avoid overlapping labels
+    const pairCounts: { [key: string]: number } = {};
+    const pairIndices: { [key: string]: number } = {};
+
+    relations.forEach((rel) => {
+      const key = [rel.source, rel.target].sort().join("-");
+      pairCounts[key] = (pairCounts[key] || 0) + 1;
+    });
+
     // Render relations
     relations.forEach((rel) => {
       const sourceNode = nodes.find(n => n.id === rel.source);
@@ -817,9 +826,23 @@ export function useCesiumViewer({
       relationEntitiesGroupRef.current.push(polylineEntity);
 
       // 2. Glowing Flow Peak Node & Label Card (Floating pill-shaped tactical label)
-      const midLon = (sourceNode.lon + targetNode.lon) / 2;
-      const midLat = (sourceNode.lat + targetNode.lat) / 2;
-      const midAlt = 25 + 160; // Exact peak altitude
+      // Solve overlap by shifting multiple labels along the parabolic arc path (tVal)
+      const key = [rel.source, rel.target].sort().join("-");
+      const totalForPair = pairCounts[key] || 1;
+      const currentIndex = pairIndices[key] || 0;
+      pairIndices[key] = currentIndex + 1;
+
+      let tVal = 0.5;
+      if (totalForPair > 1) {
+        // Space them out evenly along the curve, e.g. 0.3, 0.7
+        const step = 0.4 / (totalForPair - 1);
+        tVal = 0.3 + currentIndex * step;
+      }
+
+      const midLon = sourceNode.lon + (targetNode.lon - sourceNode.lon) * tVal;
+      const midLat = sourceNode.lat + (targetNode.lat - sourceNode.lat) * tVal;
+      const peakHeight = 160;
+      const midAlt = 25 + 4 * peakHeight * tVal * (1 - tVal);
 
       const peakLabelEntity = viewer.entities.add({
         position: Cesium.Cartesian3.fromDegrees(midLon, midLat, midAlt),
